@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Factura #{{ venta.numero_pedido_diario }} – Cafetería SENA{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:520px">
+  <div class="card text-center">
+
+    <div class="card-header-sena">
+      <i class="bi bi-receipt me-2"></i>Factura Virtual
+    </div>
+
+    <div class="card-body p-4">
+      <!-- Número de pedido grande -->
+      <p class="text-muted mb-1 fw-semibold">Tu número de pedido es</p>
+      <div class="pedido-numero">#{{ venta.numero_pedido_diario }}</div>
+      <p class="text-muted mt-1 mb-4">Muéstralo al momento de pagar y recoger</p>
+
+      <!-- Info cliente -->
+      <div class="text-start mb-3">
+        <div class="d-flex justify-content-between small border-bottom pb-2 mb-2">
+          <span class="text-muted">Cliente:</span>
+          <strong>{{ venta.cliente_rel.nombre }}</strong>
+        </div>
+        <div class="d-flex justify-content-between small border-bottom pb-2 mb-2">
+          <span class="text-muted">Documento:</span>
+          <strong>{{ venta.cliente }}</strong>
+        </div>
+        <div class="d-flex justify-content-between small border-bottom pb-2 mb-2">
+          <span class="text-muted">Ficha:</span>
+          <strong>{{ venta.cliente_rel.ficha }}</strong>
+        </div>
+        <div class="d-flex justify-content-between small border-bottom pb-2 mb-2">
+          <span class="text-muted">Fecha:</span>
+          <strong>{{ venta.fechaventa.strftime('%d/%m/%Y %H:%M') }}</strong>
+        </div>
+      </div>
+
+      <!-- Detalle de productos -->
+      <table class="table table-sm table-sena mb-3">
+        <thead>
+          <tr>
+            <th class="text-start">Producto</th>
+            <th class="text-center">Cant.</th>
+            <th class="text-end">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in venta.detalles %}
+          <tr>
+            <td class="text-start">{{ d.producto.nombre }}</td>
+            <td class="text-center">{{ d.cantidad }}</td>
+            <td class="text-end">${{ "{:,}".format(d.producto.precio * d.cantidad) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" class="text-end fw-bold">TOTAL:</td>
+            <td class="text-end fw-bold" style="color:var(--sena-green)">${{ "{:,}".format(venta.precio) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Estado actual -->
+      <div class="alert alert-warning py-2 fw-semibold" id="estado-badge">
+        <i class="bi bi-hourglass-split me-2"></i>{{ venta.estado }}
+      </div>
+
+      <a href="{{ url_for('cliente.estado_pedido', idventa=venta.idventa) }}" class="btn btn-sena w-100">
+        <i class="bi bi-arrow-clockwise me-1"></i>Ver estado en tiempo real
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Login Personal – Cafetería SENA{% endblock %}
+
+{% block body %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
+  <div class="card" style="width:100%;max-width:400px">
+    <div class="card-header-sena text-center">
+      <i class="bi bi-shield-lock fs-3 d-block mb-1"></i>
+      <h5 class="mb-0">Acceso Personal</h5>
+      <small class="opacity-75">Cajero · Entregador · Administrador</small>
+    </div>
+    <div class="card-body p-4">
+      <form method="POST" action="{{ url_for('empleados.login') }}" novalidate>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-envelope me-1" style="color:var(--sena-green)"></i>Correo electrónico
+          </label>
+          <input type="email" class="form-control" name="email" required autofocus
+                 placeholder="usuario@sena.edu.co">
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-key me-1" style="color:var(--sena-green)"></i>Contraseña
+          </label>
+          <div class="input-group">
+            <input type="password" class="form-control" name="clave" id="campoPass" required>
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePass()">
+              <i class="bi bi-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-sena w-100">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar
+        </button>
+      </form>
+
+      <div class="mt-4 p-3 rounded small" style="background:rgba(57,169,0,.08);border:1px dashed var(--sena-green)">
+        <p class="mb-1 fw-bold" style="color:var(--sena-green)">Credenciales de prueba:</p>
+        <p class="mb-0">Admin: <code>admin@sena.edu.co</code> / <code>Admin2026*</code></p>
+        <p class="mb-0">Cajero: <code>cajero@sena.edu.co</code> / <code>Cajero2026*</code></p>
+        <p class="mb-0">Entregador: <code>entregador@sena.edu.co</code> / <code>Entrega2026*</code></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePass() {
+  const campo = document.getElementById('campoPass');
+  const icon  = document.getElementById('eyeIcon');
+  if (campo.type === 'password') {
+    campo.type = 'text';
+    icon.className = 'bi bi-eye-slash';
+  } else {
+    campo.type = 'password';
+    icon.className = 'bi bi-eye';
+  }
+}
+</script>
+{% endblock %}

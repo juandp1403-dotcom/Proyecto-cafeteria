@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Panel Cajero – Cafetería SENA{% endblock %}
+
+{% block nav_links %}
+  <li class="nav-item">
+    <a class="nav-link active" href="{{ url_for('empleados.cajero') }}">
+      <i class="bi bi-cash-coin me-1"></i>Cobros
+    </a>
+  </li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:900px">
+
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
+        <i class="bi bi-cash-coin me-2"></i>Panel Cajero
+      </h4>
+      <small class="text-muted">Pedidos pendientes de pago – se actualiza automáticamente</small>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <span class="badge fs-6" style="background:var(--sena-green)" id="badge-count">
+        {{ pedidos|length }} pedido(s)
+      </span>
+      <div class="spinner-border spinner-border-sm d-none" id="spinner" style="color:var(--sena-green)"></div>
+    </div>
+  </div>
+
+  <div id="tabla-pedidos">
+    {% include 'empleados/_tabla_cajero.html' %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let ultimoHash = '{{ pedidos|map(attribute="idventa")|list|join(",") }}';
+
+async function refrescar() {
+  try {
+    const r    = await fetch('{{ url_for("empleados.api_cajero_pedidos") }}');
+    const data = await r.json();
+    const hash = data.map(p => p.idventa).join(',');
+    if (hash !== ultimoHash) {
+      ultimoHash = hash;
+      renderTabla(data);
+      document.getElementById('badge-count').textContent = data.length + ' pedido(s)';
+    }
+  } catch {}
+  setTimeout(refrescar, 4000);
+}
+
+function renderTabla(pedidos) {
+  const tbody = document.getElementById('tbody-cajero');
+  if (!pedidos.length) {
+    tbody.innerHTML = `
+      <tr><td colspan="5" class="text-center py-4 text-muted">
+        <i class="bi bi-check-all fs-3 d-block"></i>Sin pedidos pendientes
+      </td></tr>`;
+    return;
+  }
+  tbody.innerHTML = pedidos.map(p => `
+    <tr>
+      <td class="text-center fw-bold fs-5" style="color:var(--sena-green)">#${p.numero_pedido_diario}</td>
+      <td>
+        <div class="fw-semibold">${p.nombre_cliente}</div>
+        <small class="text-muted">Doc: ${p.cliente} · Ficha: ${p.ficha_cliente}</small>
+      </td>
+      <td>
+        <ul class="list-unstyled mb-0 small">
+          ${p.detalles.map(d => `<li>${d.nombre_producto} × ${d.cantidad}</li>`).join('')}
+        </ul>
+      </td>
+      <td class="fw-bold" style="color:var(--sena-green)">$${p.precio.toLocaleString('es-CO')}</td>
+      <td>
+        <button class="btn btn-sena btn-sm" onclick="marcarPagado(${p.idventa}, this)">
+          <i class="bi bi-check-circle me-1"></i>Pagado
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function marcarPagado(idventa, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    const r = await fetch(`/empleados/api/cajero/pagar/${idventa}`, { method: 'POST' });
+    if (r.ok) {
+      btn.closest('tr').remove();
+      const badge = document.getElementById('badge-count');
+      const n = parseInt(badge.textContent) - 1;
+      badge.textContent = n + ' pedido(s)';
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Pagado';
+      alert('Error al actualizar el estado.');
+    }
+  } catch {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Pagado';
+  }
+}
+
+setTimeout(refrescar, 4000);
+</script>
+{% endblock %}

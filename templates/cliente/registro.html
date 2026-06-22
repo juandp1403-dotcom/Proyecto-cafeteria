@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Identificación – Cafetería SENA{% endblock %}
+
+{% block body %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
+  <div class="card" style="width:100%;max-width:420px">
+    <div class="card-header-sena text-center">
+      <svg viewBox="0 0 120 50" xmlns="http://www.w3.org/2000/svg" style="height:40px;display:block;margin:0 auto 8px">
+        <rect width="120" height="50" rx="6" fill="white" fill-opacity=".2"/>
+        <text x="50%" y="35" dominant-baseline="middle" text-anchor="middle"
+              fill="white" font-size="22" font-weight="900" font-family="Arial,sans-serif">SENA</text>
+      </svg>
+      <h5 class="mb-0"><i class="bi bi-cup-hot me-2"></i>Cafetería CGAO</h5>
+      <small class="opacity-75">Ingresa tus datos para hacer tu pedido</small>
+    </div>
+
+    <div class="card-body p-4">
+      {% if error %}
+        <div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('cliente.registro') }}" novalidate>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-person-vcard me-1" style="color:var(--sena-green)"></i>Número de Documento
+          </label>
+          <input type="number" class="form-control form-control-lg" name="documento"
+                 placeholder="Ej: 1012345678" required autofocus>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-person me-1" style="color:var(--sena-green)"></i>Nombre Completo
+          </label>
+          <input type="text" class="form-control form-control-lg" name="nombre"
+                 placeholder="Tu nombre" required>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-mortarboard me-1" style="color:var(--sena-green)"></i>Número de Ficha
+          </label>
+          <input type="number" class="form-control form-control-lg" name="ficha"
+                 placeholder="Ej: 2895461" required>
+        </div>
+
+        <button type="submit" class="btn btn-sena w-100 btn-lg">
+          <i class="bi bi-arrow-right-circle me-2"></i>Ver Menú
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

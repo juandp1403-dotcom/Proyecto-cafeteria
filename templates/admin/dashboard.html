@@ -1,0 +1,95 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Dashboard Admin – Cafetería SENA{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-3">
+  <h4 class="fw-bold mb-4" style="color:var(--sena-green)">
+    <i class="bi bi-speedometer2 me-2"></i>Panel de Control
+  </h4>
+
+  <!-- KPI Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="fs-1 mb-1">💰</div>
+        <div class="fw-bold fs-4" style="color:var(--sena-green)">${{ "{:,}".format(total_ventas) }}</div>
+        <small class="text-muted">Total en Ventas</small>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="fs-1 mb-1">📋</div>
+        <div class="fw-bold fs-4" style="color:var(--sena-green)">{{ ventas_hoy }}</div>
+        <small class="text-muted">Pedidos Hoy</small>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="fs-1 mb-1">⚠️</div>
+        <div class="fw-bold fs-4 text-warning">{{ productos_bajo|length }}</div>
+        <small class="text-muted">Productos con Stock Bajo</small>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="fs-1 mb-1">🟢</div>
+        <div class="fw-bold fs-4" style="color:var(--sena-green)">En Línea</div>
+        <small class="text-muted">Sistema Operativo</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alertas de stock bajo -->
+  {% if productos_bajo %}
+  <div class="card mb-4">
+    <div class="card-header-sena">
+      <i class="bi bi-exclamation-triangle me-2"></i>Productos con Stock Bajo (menos de 5 unidades)
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm table-sena mb-0">
+        <thead>
+          <tr><th>Producto</th><th class="text-center">Stock Actual</th><th>Acción</th></tr>
+        </thead>
+        <tbody>
+          {% for p in productos_bajo %}
+          <tr>
+            <td>{{ p.nombre }}</td>
+            <td class="text-center">
+              <span class="badge bg-warning text-dark">{{ p.stock }}</span>
+            </td>
+            <td>
+              <a href="{{ url_for('admin_panel.compras') }}" class="btn btn-sena btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>Reabastecer
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Accesos rápidos -->
+  <div class="row g-3">
+    <div class="col-md-4">
+      <a href="{{ url_for('admin_panel.productos') }}" class="card p-4 text-decoration-none text-center h-100 d-block">
+        <i class="bi bi-box-seam fs-1" style="color:var(--sena-green)"></i>
+        <div class="fw-semibold mt-2">Gestionar Productos</div>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a href="{{ url_for('admin_panel.usuarios') }}" class="card p-4 text-decoration-none text-center h-100 d-block">
+        <i class="bi bi-people fs-1" style="color:var(--sena-green)"></i>
+        <div class="fw-semibold mt-2">Gestionar Usuarios</div>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a href="{{ url_for('admin_panel.ventas') }}" class="card p-4 text-decoration-none text-center h-100 d-block">
+        <i class="bi bi-graph-up fs-1" style="color:var(--sena-green)"></i>
+        <div class="fw-semibold mt-2">Ver Historial de Ventas</div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

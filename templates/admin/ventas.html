@@ -1,0 +1,107 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Historial Ventas – Admin{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-3">
+  <h4 class="fw-bold mb-3" style="color:var(--sena-green)">
+    <i class="bi bi-graph-up me-2"></i>Historial de Ventas
+  </h4>
+
+  <div class="table-responsive">
+    <table class="table table-hover table-sena align-middle">
+      <thead>
+        <tr>
+          <th>Pedido</th><th>Cliente</th><th>Fecha</th>
+          <th class="text-center">Total</th><th class="text-center">Estado</th><th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in ventas.items %}
+        <tr>
+          <td class="fw-bold" style="color:var(--sena-green)">#{{ v.numero_pedido_diario }}</td>
+          <td>
+            <div>{{ v.cliente_rel.nombre }}</div>
+            <small class="text-muted">Doc: {{ v.cliente }}</small>
+          </td>
+          <td class="small">{{ v.fechaventa.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="text-center fw-semibold">${{ "{:,}".format(v.precio) }}</td>
+          <td class="text-center">
+            <span class="badge
+              {% if v.estado == 'Pendiente de Pago' %}badge-pendiente
+              {% elif v.estado == 'Pagado/Preparando' %}badge-preparando
+              {% else %}badge-entregado{% endif %}">
+              {{ v.estado }}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-outline-secondary btn-sm"
+                    onclick="verDetalle({{ v.to_dict()|tojson }})">
+              <i class="bi bi-eye"></i>
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Sin registros</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Paginación -->
+  {% if ventas.pages > 1 %}
+  <nav>
+    <ul class="pagination justify-content-center">
+      {% for page in ventas.iter_pages() %}
+        {% if page %}
+          <li class="page-item {% if page == ventas.page %}active{% endif %}">
+            <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Modal Detalle Venta -->
+<div class="modal fade" id="modalDetalle" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card)">
+      <div class="modal-header card-header-sena">
+        <h5 class="modal-title" id="modalDetalleTitle">Detalle Pedido</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalDetalleBody"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function verDetalle(v) {
+  document.getElementById('modalDetalleTitle').textContent = `Pedido #${v.numero_pedido_diario}`;
+  let html = `
+    <p><strong>Cliente:</strong> ${v.nombre_cliente} (Ficha: ${v.ficha_cliente})</p>
+    <p><strong>Fecha:</strong> ${v.fechaventa}</p>
+    <table class="table table-sm table-sena">
+      <thead><tr><th>Producto</th><th class="text-center">Cant.</th><th class="text-end">Subtotal</th></tr></thead>
+      <tbody>
+        ${v.detalles.map(d => `<tr>
+          <td>${d.nombre_producto}</td>
+          <td class="text-center">${d.cantidad}</td>
+          <td class="text-end">$${d.subtotal.toLocaleString('es-CO')}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr>
+        <td colspan="2" class="text-end fw-bold">TOTAL</td>
+        <td class="text-end fw-bold" style="color:var(--sena-green)">$${v.precio.toLocaleString('es-CO')}</td>
+      </tr></tfoot>
+    </table>`;
+  document.getElementById('modalDetalleBody').innerHTML = html;
+  new bootstrap.Modal('#modalDetalle').show();
+}
+</script>
+{% endblock %}

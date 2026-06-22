@@ -1,0 +1,137 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Compras / Abastecimiento – Admin{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
+      <i class="bi bi-truck me-2"></i>Compras / Abastecimiento
+    </h4>
+    <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevaCompra">
+      <i class="bi bi-plus-circle me-1"></i>Registrar Compra
+    </button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover table-sena align-middle">
+      <thead>
+        <tr>
+          <th>ID</th><th>Vendedor</th><th>Fecha</th>
+          <th class="text-center">Total</th><th>Registrado por</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in compras.items %}
+        <tr>
+          <td class="text-muted small">{{ c.idcompra }}</td>
+          <td class="fw-semibold">{{ c.nombrevendedor }}</td>
+          <td class="small">{{ c.fechacompra.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="text-center fw-semibold">${{ "{:,}".format(c.precio) }}</td>
+          <td>{{ c.admin_rel.nombre if c.admin_rel else '–' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Sin compras registradas</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if compras.pages > 1 %}
+  <nav>
+    <ul class="pagination justify-content-center">
+      {% for page in compras.iter_pages() %}
+        {% if page %}
+          <li class="page-item {% if page == compras.page %}active{% endif %}">
+            <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Modal Nueva Compra -->
+<div class="modal fade" id="modalNuevaCompra" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="background:var(--bg-card)">
+      <div class="modal-header card-header-sena">
+        <h5 class="modal-title"><i class="bi bi-truck me-2"></i>Registrar Compra</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_panel.compra_nueva') }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nombre del vendedor / proveedor</label>
+            <input type="text" class="form-control" name="nombrevendedor" required>
+          </div>
+
+          <label class="form-label fw-semibold">Productos comprados</label>
+          <div id="items-compra">
+            <div class="row g-2 mb-2 item-row">
+              <div class="col-7">
+                <select class="form-select" name="idproducto[]" required>
+                  <option value="">— Seleccionar producto —</option>
+                  {% for p in productos %}
+                    <option value="{{ p.idproducto }}">{{ p.nombre }} (stock: {{ p.stock }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-4">
+                <input type="number" class="form-control" name="cantidad[]" placeholder="Cantidad" min="1" required>
+              </div>
+              <div class="col-1 d-flex align-items-center">
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="quitarFila(this)" disabled>
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="agregarFila()">
+            <i class="bi bi-plus me-1"></i>Agregar otro producto
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sena">Guardar Compra</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const opcionesProductos = `
+  <option value="">— Seleccionar producto —</option>
+  {% for p in productos %}
+    <option value="{{ p.idproducto }}">{{ p.nombre }} (stock: {{ p.stock }})</option>
+  {% endfor %}`;
+
+function agregarFila() {
+  const div = document.createElement('div');
+  div.className = 'row g-2 mb-2 item-row';
+  div.innerHTML = `
+    <div class="col-7">
+      <select class="form-select" name="idproducto[]" required>${opcionesProductos}</select>
+    </div>
+    <div class="col-4">
+      <input type="number" class="form-control" name="cantidad[]" placeholder="Cantidad" min="1" required>
+    </div>
+    <div class="col-1 d-flex align-items-center">
+      <button type="button" class="btn btn-outline-danger btn-sm" onclick="quitarFila(this)">
+        <i class="bi bi-trash3"></i>
+      </button>
+    </div>`;
+  document.getElementById('items-compra').appendChild(div);
+}
+
+function quitarFila(btn) {
+  btn.closest('.item-row').remove();
+}
+</script>
+{% endblock %}

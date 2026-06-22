@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Estado Pedido #{{ venta.numero_pedido_diario }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:480px">
+  <div class="card">
+    <div class="card-header-sena text-center">
+      <i class="bi bi-clock-history me-2"></i>Estado de tu Pedido
+    </div>
+    <div class="card-body p-4">
+
+      <div class="text-center mb-4">
+        <p class="text-muted mb-0">Pedido número</p>
+        <div class="pedido-numero">#{{ venta.numero_pedido_diario }}</div>
+        <p class="text-muted">{{ venta.cliente_rel.nombre }}</p>
+      </div>
+
+      <!-- Timeline de estados -->
+      <div id="timeline">
+        {% set estados = ['Pendiente de Pago', 'Pagado/Preparando', 'Entregado'] %}
+        {% set iconos  = ['💳', '👨‍🍳', '✅'] %}
+        {% set descrip = ['Acércate a la ventanilla de pago', 'Tu pedido está siendo preparado', '¡Pasa a recoger tu pedido!'] %}
+
+        {% for i in range(3) %}
+          {% set es_hecho  = (estados.index(venta.estado) > i) %}
+          {% set es_activo = (venta.estado == estados[i]) %}
+          <div class="estado-step {% if es_hecho %}hecho{% elif es_activo %}activo{% endif %}"
+               id="step-{{ i }}">
+            <div class="circle">{{ iconos[i] }}</div>
+            <div>
+              <div class="fw-semibold">{{ estados[i] }}</div>
+              <small class="text-muted">{{ descrip[i] }}</small>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if venta.estado == 'Entregado' %}
+        <div class="alert alert-success text-center mt-3">
+          <i class="bi bi-emoji-smile me-2"></i><strong>¡Buen provecho!</strong><br>
+          <small>Tu pedido ha sido entregado.</small>
+        </div>
+        <a href="{{ url_for('cliente.catalogo') }}" class="btn btn-sena w-100 mt-2">
+          Hacer otro pedido
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if venta.estado != 'Entregado' %}
+(function poll() {
+  setTimeout(async () => {
+    try {
+      const r = await fetch('{{ url_for("cliente.api_estado", idventa=venta.idventa) }}');
+      const d = await r.json();
+      if (d.estado !== '{{ venta.estado }}') {
+        // Recarga la página para mostrar el nuevo estado
+        location.reload();
+      } else {
+        poll();
+      }
+    } catch { poll(); }
+  }, 4000);
+})();
+{% endif %}
+</script>
+{% endblock %}

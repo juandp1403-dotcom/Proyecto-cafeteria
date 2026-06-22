@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Panel Entregador – Cafetería SENA{% endblock %}
+
+{% block nav_links %}
+  <li class="nav-item">
+    <a class="nav-link active" href="{{ url_for('empleados.entregador') }}">
+      <i class="bi bi-bag-check me-1"></i>Entregas
+    </a>
+  </li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:900px">
+
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
+        <i class="bi bi-bag-check me-2"></i>Panel Entregador
+      </h4>
+      <small class="text-muted">Pedidos listos para entregar – se actualiza automáticamente</small>
+    </div>
+    <span class="badge fs-6" style="background:var(--sena-green)" id="badge-ent">
+      {{ pedidos|length }} pedido(s)
+    </span>
+  </div>
+
+  <!-- Checklist de pedidos -->
+  <div id="lista-pedidos">
+    {% if pedidos %}
+      {% for p in pedidos %}
+      <div class="card mb-3" id="pedido-{{ p.idventa }}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <h5 class="fw-bold mb-1" style="color:var(--sena-green)">
+                Pedido #{{ p.numero_pedido_diario }}
+              </h5>
+              <p class="mb-1">
+                <i class="bi bi-person me-1"></i><strong>{{ p.cliente_rel.nombre }}</strong>
+                <span class="text-muted small"> · Ficha {{ p.cliente_rel.ficha }}</span>
+              </p>
+              <p class="mb-0 text-muted small">{{ p.fechaventa.strftime('%H:%M') }}</p>
+            </div>
+            <span class="badge badge-preparando px-3 py-2 fs-6">Pagado/Preparando</span>
+          </div>
+
+          <hr>
+
+          <!-- Checklist de productos -->
+          <ul class="list-group list-group-flush mb-3">
+            {% for d in p.detalles %}
+            <li class="list-group-item d-flex align-items-center gap-3 px-0"
+                style="background:transparent">
+              <input class="form-check-input m-0" type="checkbox"
+                     id="check-{{ p.idventa }}-{{ d.iddetalle }}"
+                     onchange="verificarTodos({{ p.idventa }})">
+              <label class="form-check-label" for="check-{{ p.idventa }}-{{ d.iddetalle }}">
+                <strong>{{ d.cantidad }}×</strong> {{ d.producto.nombre }}
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+
+          <button class="btn btn-sena w-100" disabled
+                  id="btn-entregar-{{ p.idventa }}"
+                  onclick="confirmarEntrega({{ p.idventa }}, this)">
+            <i class="bi bi-bag-check me-2"></i>Confirmar Entrega
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-center py-5 text-muted" id="sin-pedidos">
+        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+        Sin pedidos listos para entregar
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let totalItems = {};
+
+// Registrar total de ítems por pedido
+document.querySelectorAll('[id^="pedido-"]').forEach(card => {
+  const id    = card.id.replace('pedido-', '');
+  const total = card.querySelectorAll('input[type=checkbox]').length;
+  totalItems[id] = total;
+});
+
+function verificarTodos(idventa) {
+  const card      = document.getElementById('pedido-' + idventa);
+  const checks    = card.querySelectorAll('input[type=checkbox]');
+  const marcados  = [...checks].filter(c => c.checked).length;
+  const btnEntregar = document.getElementById('btn-entregar-' + idventa);
+  btnEntregar.disabled = marcados < checks.length;
+}
+
+async function confirmarEntrega(idventa, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando…';
+  try {
+    const r = await fetch(`/empleados/api/entregador/entregar/${idventa}`, { method: 'POST' });
+    if (r.ok) {
+      const card = document.getElementById('pedido-' + idventa);
+      card.style.transition = 'opacity .4s';
+      card.style.opacity = '0';
+      setTimeout(() => {
+        card.remove();
+        const badge = document.getElementById('badge-ent');
+        const n = parseInt(badge.textContent) - 1;
+        badge.textContent = n + ' pedido(s)';
+        if (n === 0) {
+          document.getElementById('lista-pedidos').innerHTML = `
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-check-all fs-1 d-block mb-2"></i>
+              Todos los pedidos entregados 🎉
+            </div>`;
+        }
+      }, 400);
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-bag-check me-2"></i>Confirmar Entrega';
+    }
+  } catch {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-bag-check me-2"></i>Confirmar Entrega';
+  }
+}
+
+// Polling cada 5 segundos para nuevos pedidos
+(function poll() {
+  setTimeout(async () => {
+    try {
+      const r    = await fetch('{{ url_for("empleados.api_entregador_pedidos") }}');
+      const data = await r.json();
+      // Si llegó un pedido nuevo que no está en pantalla, recargar
+      const ids = data.map(p => p.idventa.toString());
+      const enPantalla = [...document.querySelectorAll('[id^="pedido-"]')]
+                         .map(el => el.id.replace('pedido-', ''));
+      const hayNuevo = ids.some(id => !enPantalla.includes(id));
+      if (hayNuevo) location.reload();
+    } catch {}
+    poll();
+  }, 5000);
+})();
+</script>
+{% endblock %}
