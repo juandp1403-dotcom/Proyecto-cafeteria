@@ -16,8 +16,7 @@
     <table class="table table-hover table-sena align-middle">
       <thead>
         <tr>
-          <th>Documento</th><th>Nombre</th><th>Correo</th>
-          <th class="text-center">Rol</th><th>Acciones</th>
+          <th>Documento</th><th>Nombre</th><th>Correo</th><th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -26,17 +25,9 @@
           <td class="text-muted small">{{ a.documento }}</td>
           <td class="fw-semibold">{{ a.nombre }}</td>
           <td>{{ a.email }}</td>
-          <td class="text-center">
-            <span class="badge
-              {% if a.rol == 'Administrador' %}bg-danger
-              {% elif a.rol == 'Cajero' %}bg-info text-dark
-              {% else %}badge-entregado{% endif %}">
-              {{ a.rol }}
-            </span>
-          </td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre }}', '{{ a.email }}', '{{ a.rol }}')">
+                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre }}', '{{ a.email }}')">
               <i class="bi bi-pencil"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=a.documento) }}"
@@ -107,12 +98,11 @@
 
 {% block extra_js %}
 <script>
-function abrirEditarUser(doc, nombre, email, rol) {
+function abrirEditarUser(doc, nombre, email) {
   const form = document.getElementById('formEditarUser');
   form.action = `/admin/usuarios/editar/${doc}`;
   form.querySelector('[name=nombre]').value = nombre;
   form.querySelector('[name=email]').value  = email;
-  form.querySelector('[name=rol]').value    = rol;
   new bootstrap.Modal('#modalEditarUser').show();
 }
 </script>

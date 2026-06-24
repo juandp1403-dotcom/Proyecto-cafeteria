@@ -1,25 +1,15 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_required, current_user
-from functools import wraps
 from datetime import datetime
 from models import db, Producto, Admin, Venta, Compra, DetalleCompra
 from . import admin_bp
 
 
-def solo_admin(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.rol != 'Administrador':
-            flash('Acceso restringido al Administrador.', 'danger')
-            return redirect(url_for('empleados.login'))
-        return f(*args, **kwargs)
-    return wrapper
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
 @admin_bp.route('/')
 @login_required
-@solo_admin
 def dashboard():
     total_ventas    = db.session.query(db.func.sum(Venta.precio)).scalar() or 0
     ventas_hoy      = Venta.query.filter(
@@ -35,7 +25,6 @@ def dashboard():
 # ── CRUD Productos ────────────────────────────────────────────────────────────
 @admin_bp.route('/productos')
 @login_required
-@solo_admin
 def productos():
     prods = Producto.query.order_by(Producto.idproducto).all()
     return render_template('admin/productos.html', productos=prods)
@@ -43,7 +32,6 @@ def productos():
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
 @login_required
-@solo_admin
 def producto_nuevo():
     nombre = request.form.get('nombre', '').strip()
     precio = request.form.get('precio', 0)
@@ -61,7 +49,6 @@ def producto_nuevo():
 
 @admin_bp.route('/productos/editar/<int:idproducto>', methods=['POST'])
 @login_required
-@solo_admin
 def producto_editar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     prod.nombre     = request.form.get('nombre', prod.nombre).strip()
@@ -76,7 +63,6 @@ def producto_editar(idproducto):
 
 @admin_bp.route('/productos/eliminar/<int:idproducto>', methods=['POST'])
 @login_required
-@solo_admin
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     prod.activo = False  # baja lógica para preservar historial
@@ -88,7 +74,6 @@ def producto_eliminar(idproducto):
 # ── Gestión de usuarios (Admin) ───────────────────────────────────────────────
 @admin_bp.route('/usuarios')
 @login_required
-@solo_admin
 def usuarios():
     admins = Admin.query.order_by(Admin.documento).all()
     return render_template('admin/usuarios.html', admins=admins)
@@ -96,14 +81,11 @@ def usuarios():
 
 @admin_bp.route('/usuarios/nuevo', methods=['POST'])
 @login_required
-@solo_admin
 def usuario_nuevo():
     doc    = request.form.get('documento', '').strip()
     nombre = request.form.get('nombre', '').strip()
     email  = request.form.get('email', '').strip()
     clave  = request.form.get('clave', '').strip()
-    rol    = request.form.get('rol', 'Cajero')
-
     if not all([doc, nombre, email, clave]):
         flash('Todos los campos son obligatorios.', 'danger')
         return redirect(url_for('admin_panel.usuarios'))
@@ -112,22 +94,20 @@ def usuario_nuevo():
         flash('Ya existe un usuario con ese correo.', 'danger')
         return redirect(url_for('admin_panel.usuarios'))
 
-    admin = Admin(documento=int(doc), nombre=nombre, email=email, rol=rol, clave='')
+    admin = Admin(documento=int(doc), nombre=nombre, email=email, clave='')
     admin.set_password(clave)
     db.session.add(admin)
     db.session.commit()
-    flash(f'Usuario "{nombre}" creado como {rol}.', 'success')
+    flash(f'Usuario "{nombre}" creado correctamente.', 'success')
     return redirect(url_for('admin_panel.usuarios'))
 
 
 @admin_bp.route('/usuarios/editar/<int:documento>', methods=['POST'])
 @login_required
-@solo_admin
 def usuario_editar(documento):
     admin  = Admin.query.get_or_404(documento)
     admin.nombre = request.form.get('nombre', admin.nombre).strip()
     admin.email  = request.form.get('email', admin.email).strip()
-    admin.rol    = request.form.get('rol', admin.rol)
     nueva_clave  = request.form.get('clave', '').strip()
     if nueva_clave:
         admin.set_password(nueva_clave)
@@ -138,7 +118,6 @@ def usuario_editar(documento):
 
 @admin_bp.route('/usuarios/eliminar/<int:documento>', methods=['POST'])
 @login_required
-@solo_admin
 def usuario_eliminar(documento):
     if documento == current_user.documento:
         flash('No puedes eliminar tu propio usuario.', 'danger')
@@ -153,7 +132,6 @@ def usuario_eliminar(documento):
 # ── Histórico de ventas ───────────────────────────────────────────────────────
 @admin_bp.route('/ventas')
 @login_required
-@solo_admin
 def ventas():
     page   = request.args.get('page', 1, type=int)
     ventas = (Venta.query
@@ -165,7 +143,6 @@ def ventas():
 # ── Compras / Abastecimiento ──────────────────────────────────────────────────
 @admin_bp.route('/compras')
 @login_required
-@solo_admin
 def compras():
     page    = request.args.get('page', 1, type=int)
     compras = (Compra.query
@@ -177,7 +154,6 @@ def compras():
 
 @admin_bp.route('/compras/nueva', methods=['POST'])
 @login_required
-@solo_admin
 def compra_nueva():
     vendedor = request.form.get('nombrevendedor', '').strip()
     items    = request.form.getlist('idproducto[]')

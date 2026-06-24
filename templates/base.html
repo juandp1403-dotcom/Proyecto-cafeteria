@@ -245,8 +245,7 @@
         {% if current_user is defined and current_user.is_authenticated %}
           <span class="text-muted small">
             <i class="bi bi-person-circle"></i>
-            {{ current_user.nombre }} &middot;
-            <span class="fw-semibold" style="color:var(--sena-green)">{{ current_user.rol }}</span>
+            {{ current_user.nombre }}
           </span>
           <a href="{{ url_for('empleados.logout') }}" class="btn btn-outline-danger btn-sm">
             <i class="bi bi-box-arrow-right"></i>

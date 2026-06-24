@@ -55,23 +55,8 @@ def _seed_datos_iniciales():
             nombre    = os.environ.get('ADMIN_NOMBRE'),
             email     = os.environ.get('ADMIN_EMAIL'),
             clave     = generate_password_hash(os.environ.get('ADMIN_PASSWORD')),
-            rol       = 'Administrador'
         )
-        cajero = Admin(
-            documento = int(os.environ.get('CAJERO_DOCUMENTO')),
-            nombre    = os.environ.get('CAJERO_NOMBRE'),
-            email     = os.environ.get('CAJERO_EMAIL'),
-            clave     = generate_password_hash(os.environ.get('CAJERO_PASSWORD')),
-            rol       = 'Cajero'
-        )
-        entregador = Admin(
-            documento = int(os.environ.get('ENTREGADOR_DOCUMENTO')),
-            nombre    = os.environ.get('ENTREGADOR_NOMBRE'),
-            email     = os.environ.get('ENTREGADOR_EMAIL'),
-            clave     = generate_password_hash(os.environ.get('ENTREGADOR_PASSWORD')),
-            rol       = 'Entregador'
-        )
-        db.session.add_all([admin, cajero, entregador])
+        db.session.add(admin)
 
     if not Producto.query.first():
         productos = [
