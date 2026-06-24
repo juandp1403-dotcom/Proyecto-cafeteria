@@ -3,14 +3,6 @@ services:
     build: .
     expose:
       - "5545"
-    volumes:
-      - db_data:/data
     env_file:
       - path: .env
         required: false
-    environment:
-      - FLASK_ENV=development
-      - DATABASE_URL=sqlite:////data/cafeteria.db
-
-volumes:
-  db_data:
