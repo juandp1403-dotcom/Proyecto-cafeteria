@@ -60,14 +60,14 @@ def _seed_datos_iniciales():
 
     if not Producto.query.first():
         productos = [
-            Producto(nombre='Almuerzo Completo',  precio=8000, stock=50, imagen_url='🍛'),
-            Producto(nombre='Sanduche de Pollo',  precio=5000, stock=30, imagen_url='🥪'),
-            Producto(nombre='Jugo Natural',        precio=3000, stock=40, imagen_url='🥤'),
-            Producto(nombre='Café Tinto',          precio=1500, stock=60, imagen_url='☕'),
-            Producto(nombre='Empanada',            precio=2500, stock=35, imagen_url='🥟'),
-            Producto(nombre='Agua Botella 600ml',  precio=2000, stock=50, imagen_url='💧'),
-            Producto(nombre='Ensalada de Frutas',  precio=4000, stock=20, imagen_url='🍓'),
-            Producto(nombre='Chocolate Caliente',  precio=2500, stock=25, imagen_url='🍫'),
+            Producto(nombre='Almuerzo Completo',  precio=8000, stock=50),
+            Producto(nombre='Sanduche de Pollo',  precio=5000, stock=30),
+            Producto(nombre='Jugo Natural',        precio=3000, stock=40),
+            Producto(nombre='Café Tinto',          precio=1500, stock=60),
+            Producto(nombre='Empanada',            precio=2500, stock=35),
+            Producto(nombre='Agua Botella 600ml',  precio=2000, stock=50),
+            Producto(nombre='Ensalada de Frutas',  precio=4000, stock=20),
+            Producto(nombre='Chocolate Caliente',  precio=2500, stock=25),
         ]
         db.session.add_all(productos)
 

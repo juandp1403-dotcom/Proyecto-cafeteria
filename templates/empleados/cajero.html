@@ -62,7 +62,7 @@ function renderTabla(pedidos) {
   }
   tbody.innerHTML = pedidos.map(p => `
     <tr>
-      <td class="text-center fw-bold fs-5" style="color:var(--sena-green)">#${p.numero_pedido_diario}</td>
+      <td class="text-center fw-bold fs-5" style="color:var(--sena-green)">#${p.idventa}</td>
       <td>
         <div class="fw-semibold">${p.nombre_cliente}</div>
         <small class="text-muted">Doc: ${p.cliente} · Ficha: ${p.ficha_cliente}</small>

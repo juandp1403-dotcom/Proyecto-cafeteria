@@ -36,11 +36,10 @@ def producto_nuevo():
     nombre = request.form.get('nombre', '').strip()
     precio = request.form.get('precio', 0)
     stock  = request.form.get('stock', 0)
-    imagen = request.form.get('imagen_url', '').strip()
     if not nombre:
         flash('El nombre es obligatorio.', 'danger')
         return redirect(url_for('admin_panel.productos'))
-    prod = Producto(nombre=nombre, precio=int(precio), stock=int(stock), imagen_url=imagen or None)
+    prod = Producto(nombre=nombre, precio=int(precio), stock=int(stock))
     db.session.add(prod)
     db.session.commit()
     flash(f'Producto "{nombre}" creado correctamente.', 'success')
@@ -51,11 +50,9 @@ def producto_nuevo():
 @login_required
 def producto_editar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
-    prod.nombre     = request.form.get('nombre', prod.nombre).strip()
-    prod.precio     = int(request.form.get('precio', prod.precio))
-    prod.stock      = int(request.form.get('stock', prod.stock))
-    prod.imagen_url = request.form.get('imagen_url', prod.imagen_url or '').strip() or None
-    prod.activo     = request.form.get('activo') == 'on'
+    prod.nombre = request.form.get('nombre', prod.nombre).strip()
+    prod.precio = int(request.form.get('precio', prod.precio))
+    prod.stock  = int(request.form.get('stock', prod.stock))
     db.session.commit()
     flash(f'Producto "{prod.nombre}" actualizado.', 'success')
     return redirect(url_for('admin_panel.productos'))
@@ -65,9 +62,9 @@ def producto_editar(idproducto):
 @login_required
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
-    prod.activo = False  # baja lógica para preservar historial
+    db.session.delete(prod)
     db.session.commit()
-    flash(f'Producto "{prod.nombre}" desactivado.', 'warning')
+    flash(f'Producto "{prod.nombre}" eliminado.', 'warning')
     return redirect(url_for('admin_panel.productos'))
 
 

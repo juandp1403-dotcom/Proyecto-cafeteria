@@ -34,7 +34,7 @@
            data-precio="{{ p.precio }}"
            data-stock="{{ p.stock }}"
            onclick="toggleProducto(this)">
-        <div class="producto-emoji mb-2">{{ p.imagen_url or '🍽️' }}</div>
+        <div class="producto-emoji mb-2">🍽️</div>
         <div class="fw-semibold small">{{ p.nombre }}</div>
         <div class="mt-1 fw-bold" style="color:var(--sena-green)">${{ "{:,}".format(p.precio) }}</div>
         {% if p.stock < 5 %}

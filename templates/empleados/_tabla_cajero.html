@@ -13,7 +13,7 @@
       {% if pedidos %}
         {% for p in pedidos %}
         <tr>
-          <td class="text-center fw-bold fs-5" style="color:var(--sena-green)">#{{ p.numero_pedido_diario }}</td>
+          <td class="text-center fw-bold fs-5" style="color:var(--sena-green)">#{{ p.idventa }}</td>
           <td>
             <div class="fw-semibold">{{ p.cliente_rel.nombre }}</div>
             <small class="text-muted">Doc: {{ p.cliente }} · Ficha: {{ p.cliente_rel.ficha }}</small>

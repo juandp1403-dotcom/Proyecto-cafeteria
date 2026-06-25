@@ -16,39 +16,33 @@
     <table class="table table-hover table-sena align-middle">
       <thead>
         <tr>
-          <th>ID</th><th>Producto</th><th class="text-center">Precio</th>
-          <th class="text-center">Stock</th><th class="text-center">Estado</th><th>Acciones</th>
+          <th>ID</th><th>Producto</th>
+          <th class="text-center">Precio</th>
+          <th class="text-center">Stock</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
         {% for p in productos %}
-        <tr class="{% if not p.activo %}table-secondary opacity-50{% endif %}">
+        <tr>
           <td class="text-muted small">{{ p.idproducto }}</td>
-          <td>
-            <span class="me-2" style="font-size:1.3rem">{{ p.imagen_url or '🍽️' }}</span>
-            {{ p.nombre }}
-          </td>
+          <td class="fw-semibold">{{ p.nombre }}</td>
           <td class="text-center fw-semibold">${{ "{:,}".format(p.precio) }}</td>
           <td class="text-center">
             <span class="badge {% if p.stock < 5 %}bg-warning text-dark{% else %}bg-success{% endif %}">
               {{ p.stock }}
             </span>
           </td>
-          <td class="text-center">
-            <span class="badge {% if p.activo %}badge-entregado{% else %}bg-secondary{% endif %}">
-              {{ 'Activo' if p.activo else 'Inactivo' }}
-            </span>
-          </td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre }}', {{ p.precio }}, {{ p.stock }}, '{{ p.imagen_url or '' }}', {{ 'true' if p.activo else 'false' }})">
+                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre }}', {{ p.precio }}, {{ p.stock }})">
               <i class="bi bi-pencil"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.producto_eliminar', idproducto=p.idproducto) }}"
                   class="d-inline"
-                  onsubmit="return confirm('¿Desactivar este producto?')">
+                  onsubmit="return confirm('¿Eliminar este producto?')">
               <button type="submit" class="btn btn-outline-danger btn-sm">
-                <i class="bi bi-eye-slash"></i>
+                <i class="bi bi-trash3"></i>
               </button>
             </form>
           </td>
@@ -91,10 +85,6 @@
       <form method="POST" id="formEditar">
         <div class="modal-body">
           {% include 'admin/_form_producto.html' %}
-          <div class="mb-3 form-check">
-            <input type="checkbox" class="form-check-input" name="activo" id="editActivo">
-            <label class="form-check-label" for="editActivo">Producto activo</label>
-          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -108,14 +98,12 @@
 
 {% block extra_js %}
 <script>
-function abrirEditar(id, nombre, precio, stock, imagen, activo) {
+function abrirEditar(id, nombre, precio, stock) {
   const form = document.getElementById('formEditar');
   form.action = `/admin/productos/editar/${id}`;
-  form.querySelector('[name=nombre]').value    = nombre;
-  form.querySelector('[name=precio]').value    = precio;
-  form.querySelector('[name=stock]').value     = stock;
-  form.querySelector('[name=imagen_url]').value = imagen;
-  document.getElementById('editActivo').checked = activo;
+  form.querySelector('[name=nombre]').value = nombre;
+  form.querySelector('[name=precio]').value = precio;
+  form.querySelector('[name=stock]').value  = stock;
   new bootstrap.Modal('#modalEditar').show();
 }
 </script>

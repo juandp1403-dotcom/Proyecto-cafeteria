@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Factura #{{ venta.numero_pedido_diario }} – Cafetería SENA{% endblock %}
+{% block title %}Factura #{{ venta.idventa }} – Cafetería SENA{% endblock %}
 
 {% block content %}
 <div class="container py-4" style="max-width:520px">
@@ -10,12 +10,10 @@
     </div>
 
     <div class="card-body p-4">
-      <!-- Número de pedido grande -->
       <p class="text-muted mb-1 fw-semibold">Tu número de pedido es</p>
-      <div class="pedido-numero">#{{ venta.numero_pedido_diario }}</div>
+      <div class="pedido-numero">#{{ venta.idventa }}</div>
       <p class="text-muted mt-1 mb-4">Muéstralo al momento de pagar y recoger</p>
 
-      <!-- Info cliente -->
       <div class="text-start mb-3">
         <div class="d-flex justify-content-between small border-bottom pb-2 mb-2">
           <span class="text-muted">Cliente:</span>
@@ -35,7 +33,6 @@
         </div>
       </div>
 
-      <!-- Detalle de productos -->
       <table class="table table-sm table-sena mb-3">
         <thead>
           <tr>
@@ -61,13 +58,12 @@
         </tfoot>
       </table>
 
-      <!-- Estado actual -->
-      <div class="alert alert-warning py-2 fw-semibold" id="estado-badge">
-        <i class="bi bi-hourglass-split me-2"></i>{{ venta.estado }}
+      <div class="alert alert-info py-2 fw-semibold">
+        <i class="bi bi-hourglass-split me-2"></i>Pedido recibido — acércate a la ventanilla
       </div>
 
-      <a href="{{ url_for('cliente.estado_pedido', idventa=venta.idventa) }}" class="btn btn-sena w-100">
-        <i class="bi bi-arrow-clockwise me-1"></i>Ver estado en tiempo real
+      <a href="{{ url_for('cliente.catalogo') }}" class="btn btn-sena w-100 mt-2">
+        <i class="bi bi-arrow-left me-1"></i>Volver al menú
       </a>
     </div>
   </div>
