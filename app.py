@@ -33,6 +33,7 @@ def create_app(config_name='default'):
 
     with app.app_context():
         db.create_all()
+        _migrar_esquema()
         _seed_datos_iniciales()
 
     _iniciar_scheduler(app)
@@ -43,6 +44,17 @@ def create_app(config_name='default'):
 @login_manager.user_loader
 def load_user(user_id):
     return Admin.query.get(int(user_id))
+
+
+def _migrar_esquema():
+    from sqlalchemy import text
+    try:
+        db.session.execute(text(
+            "ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _seed_datos_iniciales():
