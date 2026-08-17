@@ -7,8 +7,9 @@ from . import empleados_bp
 
 @empleados_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    # Si ya está autenticado, enviarlo al catálogo en modo admin
     if current_user.is_authenticated:
-        return redirect(url_for('admin_panel.dashboard'))
+        return redirect(url_for('cliente.catalogo'))
 
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
@@ -17,7 +18,8 @@ def login():
 
         if admin and admin.check_password(clave):
             login_user(admin)
-            return redirect(url_for('admin_panel.dashboard'))
+            # Siempre va al catálogo para que opere como cliente + admin
+            return redirect(url_for('cliente.catalogo'))
 
         flash('Correo o contraseña incorrectos.', 'danger')
 
@@ -28,8 +30,8 @@ def login():
 @login_required
 def logout():
     logout_user()
-    flash('Sesión cerrada correctamente.', 'success')
-    return redirect(url_for('empleados.login'))
+    flash('Sesión de administrador cerrada.', 'success')
+    return redirect(url_for('cliente.registro'))
 
 
 @empleados_bp.route('/cajero')
@@ -37,7 +39,8 @@ def logout():
 def cajero():
     hoy = date.today()
     pedidos = (Venta.query
-               .filter(db.func.date(Venta.fechaventa) == hoy)
+               .filter(db.func.date(Venta.fechaventa) == hoy,
+                       Venta.estado == 'Pendiente de Pago')
                .order_by(Venta.idventa.asc())
                .all())
     return render_template('empleados/cajero.html', pedidos=pedidos)
@@ -48,7 +51,8 @@ def cajero():
 def api_cajero_pedidos():
     hoy = date.today()
     pedidos = (Venta.query
-               .filter(db.func.date(Venta.fechaventa) == hoy)
+               .filter(db.func.date(Venta.fechaventa) == hoy,
+                       Venta.estado == 'Pendiente de Pago')
                .order_by(Venta.idventa.asc())
                .all())
     return jsonify([p.to_dict() for p in pedidos])
@@ -57,7 +61,9 @@ def api_cajero_pedidos():
 @empleados_bp.route('/api/cajero/pagar/<int:idventa>', methods=['POST'])
 @login_required
 def api_pagar(idventa):
-    Venta.query.get_or_404(idventa)
+    venta = Venta.query.get_or_404(idventa)
+    venta.estado = 'Pagado/Preparando'
+    db.session.commit()
     return jsonify({'ok': True})
 
 
@@ -66,7 +72,8 @@ def api_pagar(idventa):
 def entregador():
     hoy = date.today()
     pedidos = (Venta.query
-               .filter(db.func.date(Venta.fechaventa) == hoy)
+               .filter(db.func.date(Venta.fechaventa) == hoy,
+                       Venta.estado == 'Pagado/Preparando')
                .order_by(Venta.idventa.asc())
                .all())
     return render_template('empleados/entregador.html', pedidos=pedidos)
@@ -77,7 +84,8 @@ def entregador():
 def api_entregador_pedidos():
     hoy = date.today()
     pedidos = (Venta.query
-               .filter(db.func.date(Venta.fechaventa) == hoy)
+               .filter(db.func.date(Venta.fechaventa) == hoy,
+                       Venta.estado == 'Pagado/Preparando')
                .order_by(Venta.idventa.asc())
                .all())
     return jsonify([p.to_dict() for p in pedidos])
@@ -86,5 +94,7 @@ def api_entregador_pedidos():
 @empleados_bp.route('/api/entregador/entregar/<int:idventa>', methods=['POST'])
 @login_required
 def api_entregar(idventa):
-    Venta.query.get_or_404(idventa)
+    venta = Venta.query.get_or_404(idventa)
+    venta.estado = 'Entregado'
+    db.session.commit()
     return jsonify({'ok': True})

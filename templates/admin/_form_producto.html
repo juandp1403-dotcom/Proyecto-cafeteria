@@ -1,3 +1,6 @@
+{# Se espera que se defina `fprefix` antes de incluir este partial para evitar IDs duplicados #}
+{% set fprefix = fprefix|default('nuevo') %}
+
 <div class="mb-3">
   <label class="form-label fw-semibold">Nombre del producto</label>
   <input type="text" class="form-control" name="nombre" placeholder="Ej: Almuerzo Completo" required>
@@ -10,5 +13,55 @@
   <div class="col">
     <label class="form-label fw-semibold">Stock</label>
     <input type="number" class="form-control" name="stock" min="0" placeholder="50" required>
+  </div>
+</div>
+
+<!-- Imagen: subir nueva o seleccionar de biblioteca -->
+<div class="mb-3">
+  <label class="form-label fw-semibold">Imagen del producto</label>
+  
+  <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active small" data-bs-toggle="tab" data-bs-target="#{{ fprefix }}TabSubir" type="button" role="tab">
+        <i class="bi bi-upload me-1"></i>Subir nueva
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link small" data-bs-toggle="tab" data-bs-target="#{{ fprefix }}TabBiblioteca" type="button" role="tab">
+        <i class="bi bi-images me-1"></i>Biblioteca
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+    <div class="tab-pane fade show active" id="{{ fprefix }}TabSubir" role="tabpanel">
+      <input type="file" class="form-control" name="imagen" accept="image/png,image/jpeg,image/gif,image/webp">
+      <div class="form-text">PNG, JPG, GIF o WebP. Maximo 5 MB.</div>
+    </div>
+
+    <div class="tab-pane fade" id="{{ fprefix }}TabBiblioteca" role="tabpanel">
+      <input type="hidden" name="imagen_biblioteca" id="{{ fprefix }}_imagen_biblioteca">
+      {% if imagenes_biblioteca %}
+      <div class="row g-2 {{ fprefix }}-grid-biblioteca">
+        {% for img in imagenes_biblioteca %}
+        <div class="col-3 col-md-2">
+          <div class="biblioteca-item position-relative"
+               data-img="{{ img }}"
+               onclick="seleccionarBiblioteca(this, '{{ fprefix }}')"
+               style="cursor:pointer;border:2px solid transparent;border-radius:8px;overflow:hidden;transition:border-color .2s">
+            <img src="{{ url_for('static', filename='imagenes/' + img) }}"
+                 alt="img" class="img-fluid rounded"
+                 style="width:100%;height:64px;object-fit:cover;">
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="form-text mt-2 {{ fprefix }}-biblioteca-seleccion"></div>
+      {% else %}
+      <div class="text-muted small py-2">
+        <i class="bi bi-info-circle me-1"></i>No hay imagenes en la biblioteca aun.
+      </div>
+      {% endif %}
+    </div>
   </div>
 </div>
