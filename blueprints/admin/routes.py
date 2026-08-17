@@ -279,6 +279,73 @@ def productos_excel():
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+@admin_bp.route('/ventas/excel')
+@login_required
+def ventas_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from io import BytesIO
+    from sqlalchemy import cast, Date
+
+    hoy = datetime.utcnow().date()
+    ventas = (Venta.query
+              .options(db.joinedload(Venta.cliente_rel),
+                       db.joinedload(Venta.detalles).joinedload(DetalleVenta.producto))
+              .filter(cast(Venta.fechaventa, Date) == hoy)
+              .order_by(Venta.idventa.asc())
+              .all())
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ventas del Dia"
+
+    headers = ['#', 'Cliente', 'Documento', 'Ficha', 'Productos', 'Valor Total', 'Estado', 'Fecha']
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="39A900", end_color="39A900", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    for row_idx, v in enumerate(ventas, 2):
+        productos_str = ', '.join(
+            f"{d.producto.nombre} x{d.cantidad}" for d in v.detalles if d.producto
+        )
+        ws.cell(row=row_idx, column=1, value=row_idx - 1).border = thin_border
+        ws.cell(row=row_idx, column=2, value=v.cliente_rel.nombre if v.cliente_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=3, value=v.cliente).border = thin_border
+        ws.cell(row=row_idx, column=4, value=v.cliente_rel.ficha if v.cliente_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=5, value=productos_str).border = thin_border
+        ws.cell(row=row_idx, column=6, value=v.precio).border = thin_border
+        ws.cell(row=row_idx, column=7, value=v.estado).border = thin_border
+        ws.cell(row=row_idx, column=8, value=v.fechaventa.strftime('%d/%m/%Y') if v.fechaventa else '').border = thin_border
+
+    ws.column_dimensions['A'].width = 5
+    ws.column_dimensions['B'].width = 25
+    ws.column_dimensions['C'].width = 14
+    ws.column_dimensions['D'].width = 10
+    ws.column_dimensions['E'].width = 45
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 18
+    ws.column_dimensions['H'].width = 14
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fecha = datetime.now().strftime('%Y-%m-%d')
+    return send_file(buf, as_attachment=True,
+                     download_name=f"ventas_{fecha}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
 # ── Gestión de usuarios (Admin) ───────────────────────────────────────────────
 @admin_bp.route('/usuarios')
 @login_required
