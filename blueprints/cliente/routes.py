@@ -1,5 +1,6 @@
 from flask import render_template, request, redirect, url_for, session, jsonify
 from datetime import datetime
+from flask_login import current_user
 from models import db, Producto, Cliente, Venta, DetalleVenta
 from . import cliente_bp
 
@@ -39,7 +40,8 @@ def registro():
 
 @cliente_bp.route('/catalogo')
 def catalogo():
-    if 'cliente_doc' not in session:
+    # Permite acceso si hay sesión de cliente O si el usuario es admin autenticado
+    if 'cliente_doc' not in session and not current_user.is_authenticated:
         return redirect(url_for('cliente.registro'))
     productos = Producto.query.all()
     return render_template('cliente/catalogo.html', productos=productos)

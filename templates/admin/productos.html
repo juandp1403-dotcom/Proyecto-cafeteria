@@ -1,22 +1,28 @@
 {% extends "admin/base_admin.html" %}
-{% block title %}Productos – Admin Cafetería{% endblock %}
+{% block title %}Productos – Admin Cafeteria{% endblock %}
 
 {% block admin_content %}
 <div class="container-fluid py-3">
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
-      <i class="bi bi-box-seam me-2"></i>Gestión de Productos
+      <i class="bi bi-box-seam me-2"></i>Gestion de Productos
     </h4>
-    <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevo">
-      <i class="bi bi-plus-circle me-1"></i>Nuevo Producto
-    </button>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_panel.productos_excel') }}" class="btn btn-outline-success">
+        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
+      </a>
+      <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevo">
+        <i class="bi bi-plus-circle me-1"></i>Nuevo Producto
+      </button>
+    </div>
   </div>
 
   <div class="table-responsive">
     <table class="table table-hover table-sena align-middle">
       <thead>
         <tr>
-          <th>ID</th><th>Producto</th>
+          <th class="text-center" style="width:64px">Imagen</th>
+          <th>Producto</th>
           <th class="text-center">Precio</th>
           <th class="text-center">Stock</th>
           <th>Acciones</th>
@@ -25,22 +31,39 @@
       <tbody>
         {% for p in productos %}
         <tr>
-          <td class="text-muted small">{{ p.idproducto }}</td>
+          <td class="text-center">
+            {% if p.imagen %}
+              <img src="{{ url_for('static', filename='productos/' + p.imagen) }}"
+                   alt="{{ p.nombre }}" class="rounded"
+                   style="width:48px; height:48px; object-fit:cover;">
+            {% else %}
+              <div class="rounded d-flex align-items-center justify-content-center"
+                   style="width:48px; height:48px; background:#e9ecef;">
+                <i class="bi bi-image text-muted"></i>
+              </div>
+            {% endif %}
+          </td>
           <td class="fw-semibold">{{ p.nombre }}</td>
           <td class="text-center fw-semibold">${{ "{:,}".format(p.precio) }}</td>
           <td class="text-center">
-            <span class="badge {% if p.stock < 5 %}bg-warning text-dark{% else %}bg-success{% endif %}">
-              {{ p.stock }}
-            </span>
+            {% if p.estado == 'En stock' %}
+              <span class="badge bg-success">{{ p.stock }} en stock</span>
+            {% elif p.estado == 'Poco stock' %}
+              <span class="badge bg-warning text-dark">{{ p.stock }} poco</span>
+            {% elif p.estado == 'Casi agotado' %}
+              <span class="badge" style="background-color:#fd7e14;">{{ p.stock }} casi</span>
+            {% else %}
+              <span class="badge bg-danger">Agotado</span>
+            {% endif %}
           </td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre }}', {{ p.precio }}, {{ p.stock }})">
+                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre|e }}', {{ p.precio }}, {{ p.stock }}, '{{ p.imagen or '' }}')">
               <i class="bi bi-pencil"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.producto_eliminar', idproducto=p.idproducto) }}"
                   class="d-inline"
-                  onsubmit="return confirm('¿Eliminar este producto?')">
+                  onsubmit="return confirm('Eliminar este producto?')">
               <button type="submit" class="btn btn-outline-danger btn-sm">
                 <i class="bi bi-trash3"></i>
               </button>
@@ -55,14 +78,15 @@
 
 <!-- Modal Nuevo Producto -->
 <div class="modal fade" id="modalNuevo" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="background:var(--bg-card)">
       <div class="modal-header card-header-sena">
         <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Nuevo Producto</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" action="{{ url_for('admin_panel.producto_nuevo') }}">
+      <form method="POST" action="{{ url_for('admin_panel.producto_nuevo') }}" enctype="multipart/form-data">
         <div class="modal-body">
+          {% set fprefix = 'nuevo' %}
           {% include 'admin/_form_producto.html' %}
         </div>
         <div class="modal-footer">
@@ -76,14 +100,18 @@
 
 <!-- Modal Editar Producto -->
 <div class="modal fade" id="modalEditar" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="background:var(--bg-card)">
       <div class="modal-header card-header-sena">
         <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Producto</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" id="formEditar">
+      <form method="POST" id="formEditar" enctype="multipart/form-data">
         <div class="modal-body">
+          <div id="editar-preview" class="text-center mb-3" style="display:none">
+            <img id="editar-preview-img" class="rounded" style="width:80px;height:80px;object-fit:cover;">
+          </div>
+          {% set fprefix = 'editar' %}
           {% include 'admin/_form_producto.html' %}
         </div>
         <div class="modal-footer">
@@ -98,13 +126,47 @@
 
 {% block extra_js %}
 <script>
-function abrirEditar(id, nombre, precio, stock) {
-  const form = document.getElementById('formEditar');
-  form.action = `/admin/productos/editar/${id}`;
+function abrirEditar(id, nombre, precio, stock, imagen) {
+  var form = document.getElementById('formEditar');
+  form.action = '/admin/productos/editar/' + id;
   form.querySelector('[name=nombre]').value = nombre;
   form.querySelector('[name=precio]').value = precio;
   form.querySelector('[name=stock]').value  = stock;
+  var hiddenLib = form.querySelector('[name=imagen_biblioteca]');
+  if (hiddenLib) hiddenLib.value = '';
+  var fileInput = form.querySelector('input[type=file]');
+  if (fileInput) fileInput.value = '';
+  var preview = document.getElementById('editar-preview');
+  var previewImg = document.getElementById('editar-preview-img');
+  if (imagen) {
+    previewImg.src = '/static/productos/' + imagen;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+  form.querySelectorAll('.biblioteca-item').forEach(function(el) {
+    el.style.borderColor = 'transparent';
+  });
+  var sel = document.getElementById('editar-biblioteca-seleccion');
+  if (sel) sel.textContent = '';
   new bootstrap.Modal('#modalEditar').show();
+}
+
+function seleccionarBiblioteca(el, prefix) {
+  var grid = el.closest('.row');
+  grid.querySelectorAll('.biblioteca-item').forEach(function(item) {
+    item.style.borderColor = 'transparent';
+  });
+  el.style.borderColor = 'var(--sena-green)';
+  var hiddenInput = document.getElementById(prefix + '_imagen_biblioteca');
+  if (hiddenInput) hiddenInput.value = el.dataset.img;
+  var form = el.closest('form');
+  if (form) {
+    var fi = form.querySelector('input[type=file]');
+    if (fi) fi.value = '';
+  }
+  var feedback = document.querySelector('.' + prefix + '-biblioteca-seleccion');
+  if (feedback) feedback.textContent = 'Seleccionada: ' + el.dataset.img;
 }
 </script>
 {% endblock %}

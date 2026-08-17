@@ -2,6 +2,11 @@
 
 {% block nav_links %}
   <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('cliente.catalogo') }}">
+      <i class="bi bi-grid me-1"></i>Menú
+    </a>
+  </li>
+  <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'admin_panel.dashboard' %}active{% endif %}"
        href="{{ url_for('admin_panel.dashboard') }}">
       <i class="bi bi-speedometer2 me-1"></i>Dashboard
@@ -10,13 +15,7 @@
   <li class="nav-item">
     <a class="nav-link {% if request.endpoint == 'admin_panel.productos' %}active{% endif %}"
        href="{{ url_for('admin_panel.productos') }}">
-      <i class="bi bi-box-seam me-1"></i>Productos
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link {% if request.endpoint == 'admin_panel.usuarios' %}active{% endif %}"
-       href="{{ url_for('admin_panel.usuarios') }}">
-      <i class="bi bi-people me-1"></i>Usuarios
+      <i class="bi bi-box-seam me-1"></i>Inventario
     </a>
   </li>
   <li class="nav-item">
@@ -29,6 +28,12 @@
     <a class="nav-link {% if request.endpoint == 'admin_panel.compras' %}active{% endif %}"
        href="{{ url_for('admin_panel.compras') }}">
       <i class="bi bi-truck me-1"></i>Compras
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.endpoint == 'admin_panel.usuarios' %}active{% endif %}"
+       href="{{ url_for('admin_panel.usuarios') }}">
+      <i class="bi bi-people me-1"></i>Usuarios
     </a>
   </li>
 {% endblock %}

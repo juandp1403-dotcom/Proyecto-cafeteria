@@ -25,7 +25,7 @@
         <tr>
           <td class="text-muted small">{{ c.idcompra }}</td>
           <td class="fw-semibold">{{ c.nombrevendedor }}</td>
-          <td class="small">{{ c.fechacompra.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="small">{{ c.fechacompra.strftime('%d/%m/%Y') if c.fechacompra else '–' }}</td>
           <td class="text-center fw-semibold">${{ "{:,}".format(c.precio) }}</td>
           <td>{{ c.admin_rel.nombre if c.admin_rel else '–' }}</td>
         </tr>

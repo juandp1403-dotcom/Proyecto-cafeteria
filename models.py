@@ -11,9 +11,22 @@ class Producto(db.Model):
     nombre     = db.Column(db.String(100), nullable=False)
     precio     = db.Column(db.Integer, nullable=False)
     stock      = db.Column(db.Integer, nullable=False, default=0)
+    imagen     = db.Column(db.String(255), nullable=True, default=None)
 
     detalles_venta  = db.relationship('DetalleVenta',  back_populates='producto')
     detalles_compra = db.relationship('DetalleCompra', back_populates='producto')
+
+    @property
+    def estado(self):
+        """Retorna el estado del producto según su stock."""
+        if self.stock == 0:
+            return 'Agotado'
+        elif self.stock < 5:
+            return 'Casi agotado'
+        elif self.stock < 10:
+            return 'Poco stock'
+        else:
+            return 'En stock'
 
     def to_dict(self):
         return {
@@ -21,6 +34,8 @@ class Producto(db.Model):
             'nombre':     self.nombre,
             'precio':     self.precio,
             'stock':      self.stock,
+            'imagen':     self.imagen,
+            'estado':     self.estado,
         }
 
 class Cliente(db.Model):
@@ -36,20 +51,36 @@ class Venta(db.Model):
     idventa    = db.Column(db.Integer, primary_key=True)
     precio     = db.Column(db.Integer, nullable=False)
     cliente    = db.Column(db.Integer, db.ForeignKey('cliente.documento'), nullable=False)
-    fechaventa = db.Column(db.DateTime, default=datetime.utcnow)
+    fechaventa = db.Column(db.Date, default=datetime.utcnow)
+    estado     = db.Column(db.String(30), nullable=False, default='Pendiente de Pago')
 
     cliente_rel = db.relationship('Cliente',      back_populates='ventas')
     detalles    = db.relationship('DetalleVenta', back_populates='venta', cascade='all, delete-orphan')
 
+    @property
+    def numero_pedido_diario(self):
+        """Número secuencial de pedido dentro del mismo día."""
+        from sqlalchemy import func
+        fecha = self.fechaventa or datetime.utcnow().date()
+        if self.idventa:
+            num = (db.session.query(func.count(Venta.idventa))
+                   .filter(Venta.fechaventa == fecha, Venta.idventa <= self.idventa)
+                   .scalar())
+        else:
+            num = 0
+        return num
+
     def to_dict(self):
         return {
-            'idventa':       self.idventa,
-            'precio':        self.precio,
-            'cliente':       self.cliente,
-            'nombre_cliente': self.cliente_rel.nombre if self.cliente_rel else '',
-            'ficha_cliente':  self.cliente_rel.ficha  if self.cliente_rel else '',
-            'fechaventa':    self.fechaventa.strftime('%d/%m/%Y %H:%M'),
-            'detalles':      [d.to_dict() for d in self.detalles]
+            'idventa':            self.idventa,
+            'numero_pedido_diario': self.numero_pedido_diario,
+            'precio':             self.precio,
+            'cliente':            self.cliente,
+            'nombre_cliente':     self.cliente_rel.nombre if self.cliente_rel else '',
+            'ficha_cliente':      self.cliente_rel.ficha  if self.cliente_rel else '',
+            'fechaventa':         self.fechaventa.strftime('%d/%m/%Y') if self.fechaventa else '',
+            'estado':             self.estado,
+            'detalles':           [d.to_dict() for d in self.detalles]
         }
 
 class DetalleVenta(db.Model):
@@ -95,11 +126,21 @@ class Compra(db.Model):
     idcompra       = db.Column(db.Integer, primary_key=True)
     nombrevendedor = db.Column(db.String(100), nullable=False)
     precio         = db.Column(db.Integer, nullable=False)
-    fechacompra    = db.Column(db.DateTime, default=datetime.utcnow)
+    fechacompra    = db.Column(db.Date, default=datetime.utcnow)
     documentoadmin = db.Column(db.Integer, db.ForeignKey('admin.documento'), nullable=False)
 
     admin_rel = db.relationship('Admin',         back_populates='compras')
     detalles  = db.relationship('DetalleCompra', back_populates='compra_rel', cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'idcompra':       self.idcompra,
+            'nombrevendedor': self.nombrevendedor,
+            'precio':         self.precio,
+            'fechacompra':    self.fechacompra.strftime('%d/%m/%Y') if self.fechacompra else '',
+            'documentoadmin': self.documentoadmin,
+            'detalles':       [d.to_dict() for d in self.detalles],
+        }
 
 class DetalleCompra(db.Model):
     __tablename__ = 'detallecompra'
@@ -110,3 +151,11 @@ class DetalleCompra(db.Model):
 
     compra_rel = db.relationship('Compra',   back_populates='detalles',        foreign_keys=[idcompra])
     producto   = db.relationship('Producto', back_populates='detalles_compra', foreign_keys=[idproducto])
+
+    def to_dict(self):
+        return {
+            'iddetallecompra': self.iddetallecompra,
+            'idproducto':      self.idproducto,
+            'nombre_producto': self.producto.nombre if self.producto else '',
+            'cantidad':        self.cantidad,
+        }

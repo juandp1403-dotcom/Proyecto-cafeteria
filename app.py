@@ -1,7 +1,7 @@
 import os
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
-from config import config
+from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
 from models import db, Admin
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -12,6 +12,15 @@ login_manager = LoginManager()
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'productos')
+
+    # ── Tunel SSH → DB ──
+    puerto = _abrir_tunel()
+    if puerto:
+        app.config['SQLALCHEMY_DATABASE_URI'] = _construir_db_url(puerto)
+    elif not app.config.get('SQLALCHEMY_DATABASE_URI'):
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafeteria.db'
 
     db.init_app(app)
     login_manager.init_app(app)
@@ -47,10 +56,30 @@ def load_user(user_id):
 
 
 def _migrar_esquema():
+    """Ajusta el esquema de la BD segun el motor (solo PostgreSQL)."""
+    uri = db.engine.url
+    if uri.drivername not in ('postgresql', 'postgresql+psycopg', 'postgresql+psycopg2'):
+        return
     from sqlalchemy import text
     try:
         db.session.execute(text(
             "ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Agregar columna imagen si no existe
+    try:
+        db.session.execute(text(
+            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Agregar columna estado a venta si no existe
+    try:
+        db.session.execute(text(
+            "ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado VARCHAR(30) DEFAULT 'Pendiente de Pago'"
         ))
         db.session.commit()
     except Exception:
@@ -63,10 +92,10 @@ def _seed_datos_iniciales():
 
     if not Admin.query.first():
         admin = Admin(
-            documento = int(os.environ.get('ADMIN_DOCUMENTO')),
-            nombre    = os.environ.get('ADMIN_NOMBRE'),
-            email     = os.environ.get('ADMIN_EMAIL'),
-            clave     = generate_password_hash(os.environ.get('ADMIN_PASSWORD')),
+            documento = int(os.environ.get('ADMIN_DOCUMENTO', '1000000')),
+            nombre    = os.environ.get('ADMIN_NOMBRE', 'Administrador SENA'),
+            email     = os.environ.get('ADMIN_EMAIL', 'admin@cafeteria.com'),
+            clave     = generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'Admin123')),
         )
         db.session.add(admin)
 

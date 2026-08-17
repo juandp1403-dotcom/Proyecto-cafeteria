@@ -1,67 +1,101 @@
 {% extends "admin/base_admin.html" %}
-{% block title %}Dashboard Admin – Cafetería SENA{% endblock %}
+{% block title %}Dashboard – Cafeteria SENA{% endblock %}
 
 {% block admin_content %}
 <div class="container-fluid py-3">
-  <h4 class="fw-bold mb-4" style="color:var(--sena-green)">
-    <i class="bi bi-speedometer2 me-2"></i>Panel de Control
-  </h4>
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
+      <i class="bi bi-speedometer2 me-2"></i>Dashboard
+    </h4>
+  </div>
 
   <!-- KPI Cards -->
   <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-6 col-lg-3">
       <div class="card p-3 text-center">
-        <div class="fs-1 mb-1">💰</div>
-        <div class="fw-bold fs-4" style="color:var(--sena-green)">${{ "{:,}".format(total_ventas) }}</div>
-        <small class="text-muted">Total en Ventas</small>
+        <div class="text-muted small mb-1"><i class="bi bi-currency-dollar me-1" style="color:var(--sena-green)"></i>Ventas Hoy</div>
+        <div class="fw-bold fs-5" style="color:var(--sena-green)">${{ "{:,}".format(total_ventas) }}</div>
       </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-6 col-lg-3">
       <div class="card p-3 text-center">
-        <div class="fs-1 mb-1">📋</div>
-        <div class="fw-bold fs-4" style="color:var(--sena-green)">{{ ventas_hoy }}</div>
-        <small class="text-muted">Pedidos Hoy</small>
+        <div class="text-muted small mb-1"><i class="bi bi-receipt me-1" style="color:var(--sena-green)"></i>Pedidos Hoy</div>
+        <div class="fw-bold fs-5" style="color:var(--sena-green)">{{ ventas_hoy }}</div>
       </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-6 col-lg-3">
       <div class="card p-3 text-center">
-        <div class="fs-1 mb-1">⚠️</div>
-        <div class="fw-bold fs-4 text-warning">{{ productos_bajo|length }}</div>
-        <small class="text-muted">Productos con Stock Bajo</small>
+        <div class="text-muted small mb-1"><i class="bi bi-exclamation-triangle me-1 text-warning"></i>Stock Bajo</div>
+        <div class="fw-bold fs-5 text-warning">{{ productos_bajo|length }}</div>
       </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-6 col-lg-3">
       <div class="card p-3 text-center">
-        <div class="fs-1 mb-1">🟢</div>
-        <div class="fw-bold fs-4" style="color:var(--sena-green)">En Línea</div>
-        <small class="text-muted">Sistema Operativo</small>
+        <div class="text-muted small mb-1"><i class="bi bi-x-circle me-1 text-danger"></i>Agotados</div>
+        <div class="fw-bold fs-5 text-danger">{{ productos_agotados|length }}</div>
       </div>
     </div>
   </div>
 
-  <!-- Alertas de stock bajo -->
-  {% if productos_bajo %}
-  <div class="card mb-4">
-    <div class="card-header-sena">
-      <i class="bi bi-exclamation-triangle me-2"></i>Productos con Stock Bajo (menos de 5 unidades)
+  <!-- Gráfica diaria + Top 15 -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-7">
+      <div class="card p-3">
+        <h6 class="fw-bold mb-2"><i class="bi bi-graph-up me-2" style="color:var(--sena-green)"></i>Ventas Diarias (7 días)</h6>
+        <div style="position:relative;height:240px">
+          <canvas id="chartDiario"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card p-3">
+        <h6 class="fw-bold mb-2"><i class="bi bi-trophy me-2" style="color:var(--sena-green)"></i>Top 15 Más Vendidos</h6>
+        {% if top_15 %}
+        <div style="max-height:260px;overflow-y:auto">
+          {% for nombre, cant in top_15 %}
+          <div class="d-flex justify-content-between align-items-center py-1 {% if not loop.last %}border-bottom{% endif %}">
+            <span class="small {% if loop.first %}fw-bold{% endif %}">
+              <span class="text-muted me-1">{{ loop.index }}.</span>{{ nombre }}
+            </span>
+            <span class="badge" style="background:var(--sena-green)">{{ cant }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted small text-center py-4">Sin ventas registradas aun.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfica mensual -->
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <div class="card p-3">
+        <h6 class="fw-bold mb-2"><i class="bi bi-calendar3 me-2" style="color:var(--sena-green)"></i>Ventas Mensuales (12 meses)</h6>
+        <div style="position:relative;height:220px">
+          <canvas id="chartMensual"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alertas stock -->
+  {% if productos_agotados %}
+  <div class="card mb-3">
+    <div class="card-header" style="background:#dc3545;color:#fff;border-radius:11px 11px 0 0 !important;padding:.65rem 1.25rem;font-weight:600">
+      <i class="bi bi-x-circle me-2"></i>Agotados
     </div>
     <div class="card-body p-0">
       <table class="table table-sm table-sena mb-0">
-        <thead>
-          <tr><th>Producto</th><th class="text-center">Stock Actual</th><th>Acción</th></tr>
-        </thead>
+        <thead><tr><th>Producto</th><th class="text-center">Stock</th><th>Acción</th></tr></thead>
         <tbody>
-          {% for p in productos_bajo %}
+          {% for p in productos_agotados %}
           <tr>
             <td>{{ p.nombre }}</td>
-            <td class="text-center">
-              <span class="badge bg-warning text-dark">{{ p.stock }}</span>
-            </td>
-            <td>
-              <a href="{{ url_for('admin_panel.compras') }}" class="btn btn-sena btn-sm">
-                <i class="bi bi-plus-circle me-1"></i>Reabastecer
-              </a>
-            </td>
+            <td class="text-center"><span class="badge bg-danger">0</span></td>
+            <td><a href="{{ url_for('admin_panel.compras') }}" class="btn btn-sena btn-sm"><i class="bi bi-plus-circle me-1"></i>Reabastecer</a></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -70,26 +104,95 @@
   </div>
   {% endif %}
 
-  <!-- Accesos rápidos -->
-  <div class="row g-3">
-    <div class="col-md-4">
-      <a href="{{ url_for('admin_panel.productos') }}" class="card p-4 text-decoration-none text-center h-100 d-block">
-        <i class="bi bi-box-seam fs-1" style="color:var(--sena-green)"></i>
-        <div class="fw-semibold mt-2">Gestionar Productos</div>
-      </a>
+  {% if productos_bajo %}
+  <div class="card mb-3">
+    <div class="card-header-sena">
+      <i class="bi bi-exclamation-triangle me-2"></i>Stock Bajo
     </div>
-    <div class="col-md-4">
-      <a href="{{ url_for('admin_panel.usuarios') }}" class="card p-4 text-decoration-none text-center h-100 d-block">
-        <i class="bi bi-people fs-1" style="color:var(--sena-green)"></i>
-        <div class="fw-semibold mt-2">Gestionar Usuarios</div>
-      </a>
-    </div>
-    <div class="col-md-4">
-      <a href="{{ url_for('admin_panel.ventas') }}" class="card p-4 text-decoration-none text-center h-100 d-block">
-        <i class="bi bi-graph-up fs-1" style="color:var(--sena-green)"></i>
-        <div class="fw-semibold mt-2">Ver Historial de Ventas</div>
-      </a>
+    <div class="card-body p-0">
+      <table class="table table-sm table-sena mb-0">
+        <thead><tr><th>Producto</th><th class="text-center">Stock</th><th>Acción</th></tr></thead>
+        <tbody>
+          {% for p in productos_bajo %}
+          <tr>
+            <td>{{ p.nombre }}</td>
+            <td class="text-center">
+              <span class="badge {% if p.stock < 5 %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ p.stock }}</span>
+            </td>
+            <td><a href="{{ url_for('admin_panel.compras') }}" class="btn btn-sena btn-sm"><i class="bi bi-plus-circle me-1"></i>Reabastecer</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
+  {% endif %}
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  var green = '#39A900';
+  var greenLight = 'rgba(57,169,0,.12)';
+
+  new Chart(document.getElementById('chartDiario'), {
+    type: 'line',
+    data: {
+      labels: {{ etiquetas_dias | tojson }},
+      datasets: [{
+        label: 'Ventas ($)',
+        data: {{ ventas_diarias | tojson }},
+        borderColor: green,
+        backgroundColor: greenLight,
+        fill: true,
+        tension: .35,
+        pointRadius: 5,
+        pointBackgroundColor: green,
+        borderWidth: 2.5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(c){ return '$' + c.parsed.y.toLocaleString('es-CO'); } } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: function(v){ return '$'+v.toLocaleString('es-CO'); }, font:{size:11} }, grid: { color:'rgba(0,0,0,.06)' } },
+        x: { grid: { display: false }, ticks: { font:{size:11} } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chartMensual'), {
+    type: 'bar',
+    data: {
+      labels: {{ etiquetas_meses | tojson }},
+      datasets: [{
+        label: 'Ventas ($)',
+        data: {{ ventas_mensuales | tojson }},
+        backgroundColor: green,
+        borderRadius: 4,
+        maxBarThickness: 40
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(c){ return '$' + c.parsed.y.toLocaleString('es-CO'); } } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: function(v){ return '$'+v.toLocaleString('es-CO'); }, font:{size:11} }, grid: { color:'rgba(0,0,0,.06)' } },
+        x: { grid: { display: false }, ticks: { font:{size:10}, maxRotation:45 } }
+      }
+    }
+  });
+})();
+</script>
 {% endblock %}

@@ -1,12 +1,48 @@
 {% extends "base.html" %}
 {% block title %}Menú – Cafetería SENA{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Badge de stock sobre las cards del catálogo */
+  .stock-badge-agotado    { background:#dc3545; color:#fff; }
+  .stock-badge-casi       { background:#fd7e14; color:#fff; }
+  .stock-badge-poco       { background:#ffc107; color:#212529; }
+</style>
+{% endblock %}
+
 {% block nav_links %}
   <li class="nav-item">
     <a class="nav-link active" href="{{ url_for('cliente.catalogo') }}">
       <i class="bi bi-grid me-1"></i>Menú
     </a>
   </li>
+  {% if current_user.is_authenticated %}
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_panel.dashboard') }}">
+      <i class="bi bi-speedometer2 me-1"></i>Dashboard
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_panel.productos') }}">
+      <i class="bi bi-box-seam me-1"></i>Inventario
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_panel.ventas') }}">
+      <i class="bi bi-graph-up me-1"></i>Ventas
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_panel.compras') }}">
+      <i class="bi bi-truck me-1"></i>Compras
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_panel.usuarios') }}">
+      <i class="bi bi-people me-1"></i>Usuarios
+    </a>
+  </li>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -17,29 +53,54 @@
       <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
         <i class="bi bi-cup-hot me-2"></i>Menú del Día
       </h4>
-      <small class="text-muted">Hola, <strong>{{ session.get('cliente_nombre','') }}</strong> — selecciona tus productos</small>
+      <small class="text-muted">
+        {% if session.get('cliente_nombre') %}
+          Hola, <strong>{{ session.get('cliente_nombre') }}</strong> — selecciona tus productos
+        {% elif current_user.is_authenticated %}
+          Bienvenido, <strong>{{ current_user.nombre }}</strong>
+          <span class="badge ms-1" style="background:#c8a000"><i class="bi bi-crown-fill me-1"></i>Admin</span>
+        {% endif %}
+      </small>
     </div>
+    {% if session.get('cliente_doc') %}
     <a href="{{ url_for('cliente.salir') }}" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Cambiar usuario
     </a>
+    {% endif %}
   </div>
 
   <!-- Catálogo de productos -->
   <div class="row g-3" id="catalogo">
     {% for p in productos %}
     <div class="col-6 col-md-4 col-lg-3">
-      <div class="card producto-card h-100 text-center p-3"
+      <div class="card producto-card h-100 text-center p-3
+                  {% if p.stock == 0 %}opacity-50{% endif %}"
            data-id="{{ p.idproducto }}"
            data-nombre="{{ p.nombre }}"
            data-precio="{{ p.precio }}"
            data-stock="{{ p.stock }}"
-           onclick="toggleProducto(this)">
-        <div class="producto-emoji mb-2">🍽️</div>
+           onclick="{% if p.stock > 0 %}toggleProducto(this){% endif %}">
+        <div class="producto-emoji mb-2">
+          {% if p.imagen %}
+            <img src="{{ url_for('static', filename='productos/' + p.imagen) }}" 
+                 alt="{{ p.nombre }}" class="rounded"
+                 style="width:64px;height:64px;object-fit:cover;">
+          {% else %}
+            🍽️
+          {% endif %}
+        </div>
         <div class="fw-semibold small">{{ p.nombre }}</div>
         <div class="mt-1 fw-bold" style="color:var(--sena-green)">${{ "{:,}".format(p.precio) }}</div>
-        {% if p.stock < 5 %}
-          <span class="badge bg-warning text-dark mt-1 small">Pocas unidades</span>
+
+        {# Badge de estado de stock #}
+        {% if p.estado == 'Agotado' %}
+          <span class="badge stock-badge-agotado mt-1 small">Agotado</span>
+        {% elif p.estado == 'Casi agotado' %}
+          <span class="badge stock-badge-casi mt-1 small">Casi agotado ({{ p.stock }})</span>
+        {% elif p.estado == 'Poco stock' %}
+          <span class="badge stock-badge-poco mt-1 small">Poco stock ({{ p.stock }})</span>
         {% endif %}
+
         <!-- Controles de cantidad (ocultos hasta seleccionar) -->
         <div class="qty-controls mt-2 d-none">
           <div class="input-group input-group-sm justify-content-center">
@@ -101,6 +162,7 @@
   </div>
 </div>
 {% endblock %}
+
 
 {% block extra_js %}
 <script>

@@ -1,7 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Identificación – Cafetería SENA{% endblock %}
 
+{% block extra_css %}
+<style>
+  .btn-admin-crown {
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: #c8a000 !important;
+    border: 2px solid #c8a000;
+    border-radius: 50%;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    transition: background-color .2s, transform .15s;
+    text-decoration: none;
+  }
+  .btn-admin-crown:hover {
+    background-color: rgba(200,160,0,.12);
+    transform: scale(1.08);
+  }
+</style>
+{% endblock %}
+
+{% block nav_links %}{% endblock %}
+
+{# Inyectamos el botón corona AL LADO del theme-toggle en el navbar #}
 {% block body %}
+
+{# Añadimos el botón corona junto al toggle vía JS tras cargar la página #}
 <div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
   <div class="card" style="width:100%;max-width:420px">
     <div class="card-header-sena text-center">
@@ -51,4 +77,26 @@
     </div>
   </div>
 </div>
+
 {% endblock %}
+
+{% block extra_js %}
+<script>
+// Inserta el botón corona junto al theme-toggle en el navbar
+document.addEventListener('DOMContentLoaded', function () {
+  const themeToggle = document.getElementById('themeToggle');
+  if (!themeToggle) return;
+
+  const crownBtn = document.createElement('a');
+  crownBtn.href      = "{{ url_for('empleados.login') }}";
+  crownBtn.title     = 'Acceso Administrador';
+  crownBtn.id        = 'adminCrownBtn';
+  crownBtn.className = 'btn-admin-crown';
+  crownBtn.innerHTML = '<i class="bi bi-crown-fill"></i>';
+
+  // Lo insertamos justo antes del theme-toggle
+  themeToggle.parentNode.insertBefore(crownBtn, themeToggle);
+});
+</script>
+{% endblock %}
+

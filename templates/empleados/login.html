@@ -1,13 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Login Personal – Cafetería SENA{% endblock %}
+{% block title %}Acceso Personal – Cafetería SENA{% endblock %}
+
+{% block extra_css %}
+<style>
+  .crown-circle {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 3px solid #c8a000;
+    background: rgba(200,160,0,.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem;
+    color: #c8a000;
+    margin: 0 auto 12px;
+  }
+</style>
+{% endblock %}
 
 {% block body %}
 <div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
   <div class="card" style="width:100%;max-width:400px">
     <div class="card-header-sena text-center">
-      <i class="bi bi-shield-lock fs-3 d-block mb-1"></i>
+      <div class="crown-circle">
+        <i class="bi bi-crown-fill"></i>
+      </div>
       <h5 class="mb-0">Acceso Personal</h5>
-      <small class="opacity-75">Cajero · Entregador · Administrador</small>
+      <small class="opacity-75">Cafetería CGAO – Admin y Empleados</small>
     </div>
     <div class="card-body p-4">
       <form method="POST" action="{{ url_for('empleados.login') }}" novalidate>
@@ -16,7 +33,7 @@
             <i class="bi bi-envelope me-1" style="color:var(--sena-green)"></i>Correo electrónico
           </label>
           <input type="email" class="form-control" name="email" required autofocus
-                 placeholder="usuario@sena.edu.co">
+                 placeholder="tu@correo.com">
         </div>
         <div class="mb-4">
           <label class="form-label fw-semibold">
@@ -34,11 +51,10 @@
         </button>
       </form>
 
-      <div class="mt-4 p-3 rounded small" style="background:rgba(57,169,0,.08);border:1px dashed var(--sena-green)">
-        <p class="mb-1 fw-bold" style="color:var(--sena-green)">Credenciales de prueba:</p>
-        <p class="mb-0">Admin: <code>admin@sena.edu.co</code> / <code>Admin2026*</code></p>
-        <p class="mb-0">Cajero: <code>cajero@sena.edu.co</code> / <code>Cajero2026*</code></p>
-        <p class="mb-0">Entregador: <code>entregador@sena.edu.co</code> / <code>Entrega2026*</code></p>
+      <div class="text-center mt-3">
+        <a href="{{ url_for('cliente.registro') }}" class="text-muted small">
+          <i class="bi bi-arrow-left me-1"></i>Volver al registro de cliente
+        </a>
       </div>
     </div>
   </div>
@@ -60,3 +76,4 @@ function togglePass() {
 }
 </script>
 {% endblock %}
+
