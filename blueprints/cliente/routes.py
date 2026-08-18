@@ -44,23 +44,49 @@ def catalogo():
     if 'cliente_doc' not in session and not current_user.is_authenticated:
         return redirect(url_for('cliente.registro'))
         
-    from sqlalchemy import func
+    from sqlalchemy import func, cast, Date
+    from datetime import datetime, timedelta
     
-    # Obtener productos ordenados por cantidad vendida (Más vendidos primero)
+    estados_pagados = ('Pagado/Preparando', 'Preparado', 'Entregado')
+    hoy = datetime.utcnow().date()
+    
+    # Obtener cantidad vendida por producto (solo pedidos pagados/entregados)
     rows = db.session.query(
-        Producto,
+        Producto.idproducto,
         func.coalesce(func.sum(DetalleVenta.cantidad), 0).label('total_vendido')
     ).outerjoin(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto) \
+     .outerjoin(Venta, Venta.idventa == DetalleVenta.idventa) \
+     .filter(
+         db.or_(
+             Venta.estado.in_(estados_pagados),
+             DetalleVenta.idventa.is_(None)
+         )
+     ) \
      .group_by(Producto.idproducto) \
      .order_by(func.coalesce(func.sum(DetalleVenta.cantidad), 0).desc()).all()
-     
-    productos = []
-    for idx, r in enumerate(rows):
-        p = r[0]
-        p.is_top = idx < 4 and r[1] > 0 # Marcar los 4 más vendidos si han vendido algo
-        productos.append(p)
+    
+    # Separar: top 10 más vendidos y el resto
+    mapa_ventas = {r.idproducto: int(r.total_vendido) for r in rows}
+    ids_por_venta = [r.idproducto for r in rows]
+    
+    top_10_ids = ids_por_venta[:10]
+    resto_ids  = ids_por_venta[10:]
+    
+    # Obtener objetos Producto
+    top_10 = Producto.query.filter(Producto.idproducto.in_(top_10_ids)).all()
+    # Mantener orden por cantidad vendida
+    top_10.sort(key=lambda p: top_10_ids.index(p.idproducto) if p.idproducto in top_10_ids else 999)
+    
+    resto = Producto.query.filter(Producto.idproducto.in_(resto_ids)).order_by(Producto.nombre).all()
+    
+    # Combinar: primero top 10, luego resto alfabético
+    productos_ordenados = top_10 + resto
+    
+    # Marcar los top 10 que tengan ventas
+    for p in productos_ordenados:
+        p.is_top = p.idproducto in top_10_ids and mapa_ventas.get(p.idproducto, 0) > 0
         
-    return render_template('cliente/catalogo.html', productos=productos)
+    return render_template('cliente/catalogo.html', productos=productos_ordenados)
 
 
 @cliente_bp.route('/confirmar', methods=['POST'])
