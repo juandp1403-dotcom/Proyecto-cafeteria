@@ -69,18 +69,29 @@
     {% endif %}
   </div>
 
+  <!-- Buscador -->
+  <div class="mb-4">
+    <div class="input-group">
+      <span class="input-group-text" style="background:var(--bg-card)"><i class="bi bi-search text-muted"></i></span>
+      <input type="text" id="buscador-productos" class="form-control form-control-lg" placeholder="Buscar por nombre de producto..." onkeyup="filtrarProductos()">
+    </div>
+  </div>
+
   <!-- Catálogo de productos -->
   <div class="row g-3" id="catalogo">
     {% for p in productos %}
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card producto-card h-100 text-center p-3
+    <div class="col-6 col-md-4 col-lg-3 producto-col" data-nombre="{{ p.nombre|lower }}">
+      <div class="card producto-card h-100 text-center p-3 position-relative
                   {% if p.stock == 0 %}opacity-50{% endif %}"
            data-id="{{ p.idproducto }}"
            data-nombre="{{ p.nombre }}"
            data-precio="{{ p.precio }}"
            data-stock="{{ p.stock }}"
            onclick="{% if p.stock > 0 %}toggleProducto(this){% endif %}">
-        <div class="producto-emoji mb-2">
+        {% if p.is_top %}
+          <span class="badge position-absolute top-0 start-50 translate-middle" style="background:var(--sena-green)"><i class="bi bi-star-fill text-warning me-1"></i>Más vendido</span>
+        {% endif %}
+        <div class="producto-emoji mb-2 mt-2">
           {% if p.imagen %}
             <img src="{{ url_for('static', filename='productos/' + p.imagen) }}" 
                  alt="{{ p.nombre }}" class="rounded"
@@ -280,6 +291,18 @@ function mostrarAlerta(tipo, msg) {
   div.innerHTML = `${msg} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
   document.body.prepend(div);
   setTimeout(() => div.remove(), 5000);
+}
+
+function filtrarProductos() {
+  const query = document.getElementById('buscador-productos').value.toLowerCase();
+  const cols = document.querySelectorAll('.producto-col');
+  cols.forEach(col => {
+    if (col.dataset.nombre.includes(query)) {
+      col.classList.remove('d-none');
+    } else {
+      col.classList.add('d-none');
+    }
+  });
 }
 </script>
 {% endblock %}

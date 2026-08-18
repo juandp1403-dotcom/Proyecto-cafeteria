@@ -43,7 +43,23 @@ def catalogo():
     # Permite acceso si hay sesión de cliente O si el usuario es admin autenticado
     if 'cliente_doc' not in session and not current_user.is_authenticated:
         return redirect(url_for('cliente.registro'))
-    productos = Producto.query.all()
+        
+    from sqlalchemy import func
+    
+    # Obtener productos ordenados por cantidad vendida (Más vendidos primero)
+    rows = db.session.query(
+        Producto,
+        func.coalesce(func.sum(DetalleVenta.cantidad), 0).label('total_vendido')
+    ).outerjoin(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto) \
+     .group_by(Producto.idproducto) \
+     .order_by(func.coalesce(func.sum(DetalleVenta.cantidad), 0).desc()).all()
+     
+    productos = []
+    for idx, r in enumerate(rows):
+        p = r[0]
+        p.is_top = idx < 4 and r[1] > 0 # Marcar los 4 más vendidos si han vendido algo
+        productos.append(p)
+        
     return render_template('cliente/catalogo.html', productos=productos)
 
 

@@ -181,3 +181,12 @@ class Reporte(db.Model):
             'idproducto':  self.producto,
             'nombre_producto': self.prod_rel.nombre if self.prod_rel else '',
         }
+class BajaInventario(db.Model):
+    __tablename__ = 'bajainventario'
+    idbaja     = db.Column(db.Integer, primary_key=True)
+    idproducto = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
+    cantidad   = db.Column(db.Integer, nullable=False)
+    motivo     = db.Column(db.String(255), nullable=False)
+    fecha      = db.Column(db.Date, default=datetime.utcnow)
+
+    producto = db.relationship('Producto', backref='bajas')
