@@ -62,25 +62,29 @@ def dashboard():
     from sqlalchemy import func, cast, Date, desc, case
 
     hoy = datetime.utcnow().date()
+    estados_pagados = ('Pagado/Preparando', 'Preparado', 'Entregado')
 
-    # KPIs
+    # KPIs — solo pedidos pagados / entregados
     total_ventas = int(db.session.query(func.coalesce(func.sum(Venta.precio), 0)).filter(
-        cast(Venta.fechaventa, Date) == hoy
+        cast(Venta.fechaventa, Date) == hoy,
+        Venta.estado.in_(estados_pagados)
     ).scalar())
     ventas_hoy = int(db.session.query(func.count(Venta.idventa)).filter(
-        cast(Venta.fechaventa, Date) == hoy
+        cast(Venta.fechaventa, Date) == hoy,
+        Venta.estado.in_(estados_pagados)
     ).scalar())
 
     productos_bajo = Producto.query.filter(Producto.stock < 10, Producto.stock > 0).order_by(Producto.stock.asc()).all()
     productos_agotados = Producto.query.filter(Producto.stock == 0).all()
 
-    # ── Ventas diarias (últimos 7 días) — 1 query ──
+    # ── Ventas diarias (últimos 7 días) — solo pagados/entregados ──
     desde_dias = hoy - timedelta(days=6)
     rows_diarios = db.session.query(
         cast(Venta.fechaventa, Date).label('dia'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
-        cast(Venta.fechaventa, Date) >= desde_dias
+        cast(Venta.fechaventa, Date) >= desde_dias,
+        Venta.estado.in_(estados_pagados)
     ).group_by('dia').order_by('dia').all()
     mapa_dias = {str(r.dia): int(r.total) for r in rows_diarios}
     ventas_diarias = []
@@ -90,13 +94,14 @@ def dashboard():
         ventas_diarias.append(mapa_dias.get(str(fecha), 0))
         etiquetas_dias.append(fecha.strftime('%d/%m'))
 
-    # ── Ventas mensuales (últimos 12 meses) — 1 query ──
+    # ── Ventas mensuales (últimos 12 meses) — solo pagados/entregados ──
     desde_meses = hoy - timedelta(days=365)
     rows_mensuales = db.session.query(
         func.date_trunc('month', Venta.fechaventa).label('mes'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
-        cast(Venta.fechaventa, Date) >= desde_meses
+        cast(Venta.fechaventa, Date) >= desde_meses,
+        Venta.estado.in_(estados_pagados)
     ).group_by('mes').order_by('mes').all()
     mapa_meses = {}
     for r in rows_mensuales:
@@ -110,7 +115,7 @@ def dashboard():
         ventas_mensuales.append(mapa_meses.get(clave, 0))
         etiquetas_meses.append(fecha_mes.strftime('%b %Y'))
 
-    # ── Top 15 productos más vendidos — 1 query ──
+    # ── Top 15 productos más vendidos — solo pagados/entregados ──
     rows_top = (
         db.session.query(
             Producto.nombre,
@@ -118,7 +123,10 @@ def dashboard():
         )
         .join(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto)
         .join(Venta, Venta.idventa == DetalleVenta.idventa)
-        .filter(cast(Venta.fechaventa, Date) >= hoy - timedelta(days=30))
+        .filter(
+            cast(Venta.fechaventa, Date) >= hoy - timedelta(days=30),
+            Venta.estado.in_(estados_pagados)
+        )
         .group_by(Producto.nombre)
         .order_by(desc('total_vendido'))
         .limit(15)
@@ -585,11 +593,42 @@ def compra_nueva():
     return redirect(url_for('admin_panel.compras'))
 
 
+<<<<<<< Updated upstream
+=======
+# ── Cambio de estado en ventas ────────────────────────────────────────────────
+@admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
+@login_required
+def venta_preparado(idventa):
+    venta = Venta.query.get_or_404(idventa)
+    if venta.estado == 'Pagado/Preparando':
+        venta.estado = 'Preparado'
+        db.session.commit()
+        flash(f'Pedido #{idventa} marcado como preparado.', 'success')
+    else:
+        flash('Solo se pueden preparar pedidos en estado Pagado/Preparando.', 'warning')
+    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
+
+
+@admin_bp.route('/ventas/entregado/<int:idventa>', methods=['POST'])
+@login_required
+def venta_entregado(idventa):
+    venta = Venta.query.get_or_404(idventa)
+    if venta.estado in ('Pagado/Preparando', 'Preparado'):
+        venta.estado = 'Entregado'
+        db.session.commit()
+        flash(f'Pedido #{idventa} marcado como entregado.', 'success')
+    else:
+        flash('No se puede entregar este pedido.', 'warning')
+    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
+
+
+>>>>>>> Stashed changes
 # ── Reportes ──────────────────────────────────────────────────────────────────
 @admin_bp.route('/reportes')
 @login_required
 def reportes():
     page = request.args.get('page', 1, type=int)
+<<<<<<< Updated upstream
     reportes = (Reporte.query
                 .options(db.joinedload(Reporte.admin_rel),
                          db.joinedload(Reporte.prod_rel))
@@ -597,6 +636,15 @@ def reportes():
                 .paginate(page=page, per_page=15))
     productos = Producto.query.order_by(Producto.nombre).all()
     return render_template('admin/reportes.html', reportes=reportes, productos=productos)
+=======
+    reportes_q = (Reporte.query
+                  .options(db.joinedload(Reporte.admin_rel),
+                           db.joinedload(Reporte.prod_rel))
+                  .order_by(Reporte.idreporte.desc())
+                  .paginate(page=page, per_page=15))
+    productos = Producto.query.order_by(Producto.nombre).all()
+    return render_template('admin/reportes.html', reportes=reportes_q, productos=productos)
+>>>>>>> Stashed changes
 
 
 @admin_bp.route('/reportes/crear', methods=['POST'])
@@ -624,3 +672,63 @@ def reporte_crear():
     db.session.commit()
     flash(f'Reporte #{reporte.idreporte} creado correctamente.', 'success')
     return redirect(url_for('admin_panel.reportes'))
+<<<<<<< Updated upstream
+=======
+
+
+@admin_bp.route('/reportes/excel')
+@login_required
+def reportes_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from io import BytesIO
+
+    reportes = (Reporte.query
+                .options(db.joinedload(Reporte.admin_rel),
+                         db.joinedload(Reporte.prod_rel))
+                .order_by(Reporte.idreporte.desc())
+                .all())
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reportes"
+
+    headers = ['ID Reporte', 'ID Admin', 'Nombre Admin', 'Producto', 'Descripción', 'Fecha']
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="39A900", end_color="39A900", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    for row_idx, r in enumerate(reportes, 2):
+        ws.cell(row=row_idx, column=1, value=r.idreporte).border = thin_border
+        ws.cell(row=row_idx, column=2, value=r.idadmin).border = thin_border
+        ws.cell(row=row_idx, column=3, value=r.admin_rel.nombre if r.admin_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=4, value=r.prod_rel.nombre if r.prod_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=5, value=r.descripcion or '').border = thin_border
+        ws.cell(row=row_idx, column=6, value=r.fecha.strftime('%d/%m/%Y') if r.fecha else '').border = thin_border
+
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 22
+    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['E'].width = 40
+    ws.column_dimensions['F'].width = 14
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fecha = datetime.now().strftime('%Y-%m-%d')
+    return send_file(buf, as_attachment=True,
+                     download_name=f"reportes_{fecha}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+>>>>>>> Stashed changes

@@ -64,8 +64,12 @@
             </div>
             <span class="badge
               {% if v.estado == 'Pendiente de Pago' %}badge-pendiente
+<<<<<<< Updated upstream
               {% elif v.estado == 'Pagado/Preparando' %}badge-preparando
               {% elif v.estado == 'Preparado' %}badge-preparando
+=======
+              {% elif v.estado == 'Pagado/Preparando' or v.estado == 'Preparado' %}badge-preparando
+>>>>>>> Stashed changes
               {% elif v.estado == 'Entregado' %}badge-entregado
               {% else %}badge-cancelado{% endif %} fs-6">
               {{ v.estado }}
