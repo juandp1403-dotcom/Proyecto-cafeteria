@@ -39,7 +39,7 @@
   <!-- Lista de pedidos -->
   <div class="d-flex flex-column gap-2">
     {% for v in ventas.items %}
-    <div class="card" style="border-left:4px solid {% if v.estado == 'Pendiente de Pago' %}#f0ad4e{% elif v.estado == 'Pagado/Preparando' or v.estado == 'Preparado' %}#17a2b8{% elif v.estado == 'Entregado' %}var(--sena-green){% else %}#dc3545{% endif %}">
+    <div class="card" style="border-left:4px solid {% if v.estado == 'Pendiente de Pago' %}#f0ad4e{% elif v.estado == 'Pagado/Preparando' %}#17a2b8{% elif v.estado == 'Entregado' %}var(--sena-green){% else %}#dc3545{% endif %}">
       <div class="card-body py-2 px-3">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <!-- Info principal -->
@@ -64,12 +64,7 @@
             </div>
             <span class="badge
               {% if v.estado == 'Pendiente de Pago' %}badge-pendiente
-<<<<<<< Updated upstream
-              {% elif v.estado == 'Pagado/Preparando' %}badge-preparando
-              {% elif v.estado == 'Preparado' %}badge-preparando
-=======
               {% elif v.estado == 'Pagado/Preparando' or v.estado == 'Preparado' %}badge-preparando
->>>>>>> Stashed changes
               {% elif v.estado == 'Entregado' %}badge-entregado
               {% else %}badge-cancelado{% endif %} fs-6">
               {{ v.estado }}
@@ -106,7 +101,7 @@
           </table>
         </div>
 
-        <!-- Botones de acción según estado -->
+        <!-- Botones de acción para pedidos pendientes -->
         {% if v.estado == 'Pendiente de Pago' %}
         <div class="d-flex gap-2 mt-2">
           <form method="POST" action="{{ url_for('admin_panel.venta_aceptar', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
@@ -119,30 +114,6 @@
                 onsubmit="return confirm('¿Rechazar este pedido y devolver stock?')">
             <button type="submit" class="btn btn-sm btn-danger">
               <i class="bi bi-x-circle me-1"></i>Rechazar
-            </button>
-          </form>
-        </div>
-        {% elif v.estado == 'Pagado/Preparando' %}
-        <div class="d-flex gap-2 mt-2">
-          <form method="POST" action="{{ url_for('admin_panel.venta_preparado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
-                onsubmit="return confirm('¿Marcar como preparado?')">
-            <button type="submit" class="btn btn-sm btn-info text-white">
-              <i class="bi bi-fire me-1"></i>Preparado
-            </button>
-          </form>
-          <form method="POST" action="{{ url_for('admin_panel.venta_entregado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
-                onsubmit="return confirm('¿Marcar como entregado?')">
-            <button type="submit" class="btn btn-sm btn-success">
-              <i class="bi bi-bag-check me-1"></i>Entregado
-            </button>
-          </form>
-        </div>
-        {% elif v.estado == 'Preparado' %}
-        <div class="d-flex gap-2 mt-2">
-          <form method="POST" action="{{ url_for('admin_panel.venta_entregado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
-                onsubmit="return confirm('¿Marcar como entregado?')">
-            <button type="submit" class="btn btn-sm btn-success">
-              <i class="bi bi-bag-check me-1"></i>Entregado
             </button>
           </form>
         </div>
