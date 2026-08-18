@@ -73,7 +73,7 @@ def entregador():
     hoy = date.today()
     pedidos = (Venta.query
                .filter(db.func.date(Venta.fechaventa) == hoy,
-                       Venta.estado == 'Pagado/Preparando')
+                       Venta.estado == 'Preparado')
                .order_by(Venta.idventa.asc())
                .all())
     return render_template('empleados/entregador.html', pedidos=pedidos)
@@ -85,7 +85,7 @@ def api_entregador_pedidos():
     hoy = date.today()
     pedidos = (Venta.query
                .filter(db.func.date(Venta.fechaventa) == hoy,
-                       Venta.estado == 'Pagado/Preparando')
+                       Venta.estado == 'Preparado')
                .order_by(Venta.idventa.asc())
                .all())
     return jsonify([p.to_dict() for p in pedidos])

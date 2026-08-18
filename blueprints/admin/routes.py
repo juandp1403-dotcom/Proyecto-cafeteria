@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 import shutil
 import uuid
-from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario
+from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte
 from . import admin_bp
 
 
@@ -509,6 +509,32 @@ def venta_rechazar(idventa):
     return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
 
 
+@admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
+@login_required
+def venta_preparado(idventa):
+    venta = Venta.query.get_or_404(idventa)
+    if venta.estado == 'Pagado/Preparando':
+        venta.estado = 'Preparado'
+        db.session.commit()
+        flash(f'Pedido #{idventa} marcado como preparado.', 'success')
+    else:
+        flash('Solo se pueden preparar pedidos en estado Pagado/Preparando.', 'warning')
+    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
+
+
+@admin_bp.route('/ventas/entregado/<int:idventa>', methods=['POST'])
+@login_required
+def venta_entregado(idventa):
+    venta = Venta.query.get_or_404(idventa)
+    if venta.estado in ('Pagado/Preparando', 'Preparado'):
+        venta.estado = 'Entregado'
+        db.session.commit()
+        flash(f'Pedido #{idventa} marcado como entregado.', 'success')
+    else:
+        flash('No se puede entregar este pedido.', 'warning')
+    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
+
+
 # ── Compras / Abastecimiento ──────────────────────────────────────────────────
 @admin_bp.route('/compras')
 @login_required
@@ -557,3 +583,44 @@ def compra_nueva():
     db.session.commit()
     flash('Compra registrada y stock actualizado.', 'success')
     return redirect(url_for('admin_panel.compras'))
+
+
+# ── Reportes ──────────────────────────────────────────────────────────────────
+@admin_bp.route('/reportes')
+@login_required
+def reportes():
+    page = request.args.get('page', 1, type=int)
+    reportes = (Reporte.query
+                .options(db.joinedload(Reporte.admin_rel),
+                         db.joinedload(Reporte.prod_rel))
+                .order_by(Reporte.idreporte.desc())
+                .paginate(page=page, per_page=15))
+    productos = Producto.query.order_by(Producto.nombre).all()
+    return render_template('admin/reportes.html', reportes=reportes, productos=productos)
+
+
+@admin_bp.route('/reportes/crear', methods=['POST'])
+@login_required
+def reporte_crear():
+    descripcion = request.form.get('descripcion', '').strip()
+    idproducto  = request.form.get('idproducto', '', type=int)
+
+    if not idproducto:
+        flash('Debe seleccionar un producto.', 'danger')
+        return redirect(url_for('admin_panel.reportes'))
+
+    prod = Producto.query.get(idproducto)
+    if not prod:
+        flash('Producto no encontrado.', 'danger')
+        return redirect(url_for('admin_panel.reportes'))
+
+    reporte = Reporte(
+        idadmin     = current_user.documento,
+        descripcion = descripcion or None,
+        fecha       = datetime.utcnow(),
+        producto    = idproducto
+    )
+    db.session.add(reporte)
+    db.session.commit()
+    flash(f'Reporte #{reporte.idreporte} creado correctamente.', 'success')
+    return redirect(url_for('admin_panel.reportes'))
