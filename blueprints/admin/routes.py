@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 import shutil
 import uuid
-from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra
+from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario
 from . import admin_bp
 
 
@@ -214,6 +214,29 @@ def producto_eliminar(idproducto):
     db.session.delete(prod)
     db.session.commit()
     flash(f'Producto "{prod.nombre}" eliminado.', 'warning')
+    return redirect(url_for('admin_panel.productos'))
+
+@admin_bp.route('/productos/baja/<int:idproducto>', methods=['POST'])
+@login_required
+def producto_baja(idproducto):
+    prod = Producto.query.get_or_404(idproducto)
+    cantidad = int(request.form.get('cantidad', 0))
+    motivo = request.form.get('motivo', '').strip()
+    
+    if cantidad <= 0 or not motivo:
+        flash('La cantidad y el motivo son obligatorios.', 'danger')
+        return redirect(url_for('admin_panel.productos'))
+        
+    if cantidad > prod.stock:
+        flash(f'No puedes dar de baja más unidades de las que hay en stock ({prod.stock}).', 'danger')
+        return redirect(url_for('admin_panel.productos'))
+        
+    prod.stock -= cantidad
+    baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo)
+    db.session.add(baja)
+    db.session.commit()
+    
+    flash(f'Se han dado de baja {cantidad} unidades de "{prod.nombre}" por motivo: {motivo}.', 'success')
     return redirect(url_for('admin_panel.productos'))
 
 

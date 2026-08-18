@@ -5,19 +5,22 @@
 <style>
   .btn-admin-crown {
     cursor: pointer;
-    font-size: 1.1rem;
-    color: #000000 !important;
-    border: 2px solid #FFC400;
+    font-size: 1.2rem;
+    color: #FFD700 !important;
+    border: 2px solid #FFD700;
     border-radius: 50%;
-    width: 36px; height: 36px;
+    width: 38px; height: 38px;
     display: flex; align-items: center; justify-content: center;
-    background-color: #FFC400;
-    transition: background-color .2s, transform .15s;
+    background-color: #1a1a1a;
+    transition: all .2s ease;
     text-decoration: none;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
   }
   .btn-admin-crown:hover {
-    background-color: #E6B000;
-    transform: scale(1.08);
+    background-color: #FFD700;
+    color: #1a1a1a !important;
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
   }
 </style>
 {% endblock %}
