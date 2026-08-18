@@ -1,0 +1,123 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Reportes – Admin{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
+      <i class="bi bi-clipboard2-data me-2"></i>Reportes
+    </h4>
+    <button class="btn btn-sena btn-sm" data-bs-toggle="modal" data-bs-target="#modalCrearReporte">
+      <i class="bi bi-plus-circle me-1"></i>Nuevo Reporte
+    </button>
+  </div>
+
+  <!-- Lista de reportes -->
+  <div class="d-flex flex-column gap-2">
+    {% for r in reportes.items %}
+    <div class="card" style="border-left:4px solid var(--sena-green)">
+      <div class="card-body py-2 px-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-3">
+            <div class="text-center" style="min-width:50px">
+              <div class="fw-bold fs-5" style="color:var(--sena-green)">
+                #{{ r.idreporte }}
+              </div>
+              <small class="text-muted">ID</small>
+            </div>
+            <div>
+              <div class="fw-semibold">{{ r.prod_rel.nombre if r.prod_rel else 'N/A' }}</div>
+              <small class="text-muted">Admin: {{ r.admin_rel.nombre if r.admin_rel else 'N/A' }} &middot; Doc: {{ r.idadmin }}</small>
+            </div>
+          </div>
+          <div class="text-end">
+            <small class="text-muted">{{ r.fecha.strftime('%d/%m/%Y') if r.fecha else 'N/A' }}</small>
+          </div>
+        </div>
+        {% if r.descripcion %}
+        <div class="mt-2">
+          <small class="text-muted"><i class="bi bi-text-left me-1"></i>{{ r.descripcion }}</small>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox" style="font-size:3rem"></i>
+      <p class="mt-2">No hay reportes registrados.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Paginación -->
+  {% if reportes.pages > 1 %}
+  <nav class="mt-3">
+    <ul class="pagination justify-content-center">
+      {% if reportes.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ reportes.prev_num }}">&laquo;</a>
+        </li>
+      {% endif %}
+      {% for page in reportes.iter_pages() %}
+        {% if page %}
+          <li class="page-item {% if page == reportes.page %}active{% endif %}">
+            <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+        {% endif %}
+      {% endfor %}
+      {% if reportes.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ reportes.next_num }}">&raquo;</a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Modal: Crear Reporte -->
+<div class="modal fade" id="modalCrearReporte" tabindex="-1" aria-labelledby="modalCrearReporteLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin_panel.reporte_crear') }}">
+        <div class="modal-header card-header-sena">
+          <h5 class="modal-title" id="modalCrearReporteLabel">
+            <i class="bi bi-clipboard2-plus me-2"></i>Nuevo Reporte
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="idproducto" class="form-label fw-semibold">Producto *</label>
+            <select class="form-select" id="idproducto" name="idproducto" required>
+              <option value="" selected disabled>Seleccionar producto...</option>
+              {% for p in productos %}
+                <option value="{{ p.idproducto }}">{{ p.nombre }} (ID: {{ p.idproducto }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="descripcion" class="form-label fw-semibold">Descripción</label>
+            <textarea class="form-control" id="descripcion" name="descripcion" rows="3"
+                      placeholder="Descripción del reporte..."></textarea>
+          </div>
+          <div class="mb-3">
+            <small class="text-muted">
+              <i class="bi bi-info-circle me-1"></i>
+              Admin: {{ current_user.nombre }} ({{ current_user.documento }})
+            </small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sena btn-sm">
+            <i class="bi bi-check-circle me-1"></i>Crear Reporte
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
