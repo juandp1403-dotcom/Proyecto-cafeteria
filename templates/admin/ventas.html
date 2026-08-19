@@ -101,19 +101,41 @@
           </table>
         </div>
 
-        <!-- Botones de acción para pedidos pendientes -->
+        <!-- Botones de acción -->
         {% if v.estado == 'Pendiente de Pago' %}
         <div class="d-flex gap-2 mt-2">
           <form method="POST" action="{{ url_for('admin_panel.venta_aceptar', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
                 onsubmit="return confirm('¿Aceptar este pedido?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="btn btn-sm btn-success">
               <i class="bi bi-check-circle me-1"></i>Aceptar
             </button>
           </form>
           <form method="POST" action="{{ url_for('admin_panel.venta_rechazar', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
                 onsubmit="return confirm('¿Rechazar este pedido y devolver stock?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="btn btn-sm btn-danger">
               <i class="bi bi-x-circle me-1"></i>Rechazar
+            </button>
+          </form>
+        </div>
+        {% elif v.estado == 'Pagado/Preparando' %}
+        <div class="d-flex gap-2 mt-2">
+          <form method="POST" action="{{ url_for('admin_panel.venta_preparado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
+                onsubmit="return confirm('¿Marcar como preparado?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-sm btn-info">
+              <i class="bi bi-hourglass-split me-1"></i>Marcar Preparado
+            </button>
+          </form>
+        </div>
+        {% elif v.estado == 'Preparado' %}
+        <div class="d-flex gap-2 mt-2">
+          <form method="POST" action="{{ url_for('admin_panel.venta_entregado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
+                onsubmit="return confirm('¿Marcar como entregado?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-sm btn-success">
+              <i class="bi bi-bag-check me-1"></i>Marcar Entregado
             </button>
           </form>
         </div>

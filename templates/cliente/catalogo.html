@@ -133,6 +133,11 @@
       <p class="mt-2">No hay productos disponibles por el momento.</p>
     </div>
     {% endfor %}
+    <!-- Mensaje cuando la búsqueda no arroja resultados -->
+    <div class="col-12 text-center text-muted py-5 d-none" id="sin-resultados">
+      <i class="bi bi-search" style="font-size:3rem"></i>
+      <p class="mt-2">No se encontraron productos que coincidan con tu búsqueda.</p>
+    </div>
   </div>
 </div>
 
@@ -272,7 +277,10 @@ async function confirmarPedido() {
   try {
     const resp = await fetch('{{ url_for("cliente.confirmar") }}', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content
+      },
       body:    JSON.stringify({ items })
     });
     const data = await resp.json();
@@ -299,15 +307,28 @@ function mostrarAlerta(tipo, msg) {
 }
 
 function filtrarProductos() {
-  const query = document.getElementById('buscador-productos').value.toLowerCase();
+  const query = quitarTildes(document.getElementById('buscador-productos').value.toLowerCase());
   const cols = document.querySelectorAll('.producto-col');
+  let visibles = 0;
   cols.forEach(col => {
-    if (col.dataset.nombre.includes(query)) {
+    const nombre = quitarTildes(col.dataset.nombre);
+    if (nombre.includes(query)) {
       col.classList.remove('d-none');
+      visibles++;
     } else {
       col.classList.add('d-none');
     }
   });
+  const sinResultados = document.getElementById('sin-resultados');
+  if (visibles === 0 && query.length > 0) {
+    sinResultados.classList.remove('d-none');
+  } else {
+    sinResultados.classList.add('d-none');
+  }
+}
+
+function quitarTildes(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 </script>
 {% endblock %}

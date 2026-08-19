@@ -49,6 +49,7 @@
       {% endif %}
 
       <form method="POST" action="{{ url_for('cliente.registro') }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
           <label class="form-label fw-semibold">
             <i class="bi bi-person-vcard me-1" style="color:var(--sena-green)"></i>Número de Documento

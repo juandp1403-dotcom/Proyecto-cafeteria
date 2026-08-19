@@ -1,12 +1,14 @@
 import os
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
 from models import db, Admin
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 
 login_manager = LoginManager()
+csrf = CSRFProtect()
 
 
 def create_app(config_name='default'):
@@ -23,6 +25,7 @@ def create_app(config_name='default'):
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafeteria.db'
 
     db.init_app(app)
+    csrf.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = 'empleados.login'
     login_manager.login_message = 'Inicia sesión para continuar.'
@@ -84,20 +87,52 @@ def _migrar_esquema():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # Agregar columna rol a admin si no existe
+    try:
+        db.session.execute(text(
+            "ALTER TABLE admin ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'admin'"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _seed_datos_iniciales():
     from models import Admin, Producto
     from werkzeug.security import generate_password_hash
 
-    if not Admin.query.first():
-        admin = Admin(
-            documento = int(os.environ.get('ADMIN_DOCUMENTO', '1000000')),
-            nombre    = os.environ.get('ADMIN_NOMBRE', 'Administrador SENA'),
-            email     = os.environ.get('ADMIN_EMAIL', 'admin@cafeteria.com'),
-            clave     = generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'Admin123')),
-        )
-        db.session.add(admin)
+    documentos_existentes = {a.documento for a in Admin.query.with_entities(Admin.documento).all()}
+
+    doc_admin = int(os.environ.get('ADMIN_DOCUMENTO', '1000000'))
+    doc_cajero = int(os.environ.get('CAJERO_DOCUMENTO', '2000000'))
+    doc_entregador = int(os.environ.get('ENTREGADOR_DOCUMENTO', '3000000'))
+
+    if doc_admin not in documentos_existentes:
+        db.session.add(Admin(
+            documento=doc_admin,
+            nombre=os.environ.get('ADMIN_NOMBRE', 'Administrador SENA'),
+            email=os.environ.get('ADMIN_EMAIL', 'admin@cafeteria.com'),
+            clave=generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'Admin123')),
+            rol='admin',
+        ))
+
+    if doc_cajero not in documentos_existentes:
+        db.session.add(Admin(
+            documento=doc_cajero,
+            nombre=os.environ.get('CAJERO_NOMBRE', 'Cajero Principal'),
+            email=os.environ.get('CAJERO_EMAIL', 'cajero@cafeteria.com'),
+            clave=generate_password_hash(os.environ.get('CAJERO_PASSWORD', 'Cajero123')),
+            rol='cajero',
+        ))
+
+    if doc_entregador not in documentos_existentes:
+        db.session.add(Admin(
+            documento=doc_entregador,
+            nombre=os.environ.get('ENTREGADOR_NOMBRE', 'Entregador Principal'),
+            email=os.environ.get('ENTREGADOR_EMAIL', 'entregador@cafeteria.com'),
+            clave=generate_password_hash(os.environ.get('ENTREGADOR_PASSWORD', 'Entregador123')),
+            rol='entregador',
+        ))
 
     if not Producto.query.first():
         productos = [
@@ -116,15 +151,8 @@ def _seed_datos_iniciales():
 
 
 def _iniciar_scheduler(app):
-    scheduler = BackgroundScheduler()
-
-    def resetear_contadores():
-        with app.app_context():
-            pass
-
-    scheduler.add_job(resetear_contadores, 'cron', hour=0, minute=0)
-    scheduler.start()
-    atexit.register(lambda: scheduler.shutdown())
+    # TODO: implementar reset diario de contadores si se necesita
+    pass
 
 
 if __name__ == '__main__':

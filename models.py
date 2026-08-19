@@ -109,6 +109,10 @@ class Admin(UserMixin, db.Model):
     nombre    = db.Column(db.String(100), nullable=False)
     clave     = db.Column(db.String(256), nullable=False)
     email     = db.Column(db.String(120), unique=True, nullable=False)
+    rol       = db.Column(db.String(20), nullable=False, default='admin')
+    # La columna 'rol' existe pero actualmente no se usa para control de acceso;
+    # todos los Admin autenticados tienen el mismo acceso. Se conserva por si se
+    # retoma diferenciación de roles en el futuro.
 
     compras = db.relationship('Compra', back_populates='admin_rel')
 

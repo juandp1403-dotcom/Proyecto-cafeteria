@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, session, jsonify
+from flask import render_template, request, redirect, url_for, session, jsonify, flash
 from datetime import datetime
 from flask_login import current_user
 from models import db, Producto, Cliente, Venta, DetalleVenta
@@ -92,24 +92,42 @@ def catalogo():
 @cliente_bp.route('/confirmar', methods=['POST'])
 def confirmar():
     if 'cliente_doc' not in session:
-        return jsonify({'error': 'Sesión expirada'}), 403
+        return jsonify({'error': 'Sesion expirada'}), 403
 
     data  = request.get_json()
     items = data.get('items', [])
     if not items:
-        return jsonify({'error': 'Carrito vacío'}), 400
+        return jsonify({'error': 'Carrito vacio'}), 400
 
     total = 0
     detalles_a_guardar = []
 
     for item in items:
-        prod = Producto.query.get(item['idproducto'])
+        try:
+            idproducto = int(item['idproducto'])
+            cantidad = int(item['cantidad'])
+        except (ValueError, TypeError, KeyError):
+            return jsonify({'error': 'Datos de producto invalidos'}), 400
+
+        if cantidad <= 0 or cantidad > 100:
+            return jsonify({'error': f'Cantidad invalida para el producto {idproducto} (debe ser entre 1 y 100)'}), 400
+
+        prod = Producto.query.get(idproducto)
         if not prod:
-            return jsonify({'error': f'Producto {item["idproducto"]} no disponible'}), 400
-        if prod.stock < item['cantidad']:
+            return jsonify({'error': f'Producto {idproducto} no disponible'}), 400
+
+        detalles_a_guardar.append((prod, cantidad))
+        total += prod.precio * cantidad
+
+    # Descuento atomico de stock con UPDATE condicional
+    for prod, cant in detalles_a_guardar:
+        affected = Producto.query.filter(
+            Producto.idproducto == prod.idproducto,
+            Producto.stock >= cant
+        ).update({'stock': Producto.stock - cant})
+        if affected == 0:
+            db.session.rollback()
             return jsonify({'error': f'Stock insuficiente para {prod.nombre}'}), 400
-        total += prod.precio * item['cantidad']
-        detalles_a_guardar.append((prod, item['cantidad']))
 
     venta = Venta(
         precio     = total,
@@ -122,7 +140,6 @@ def confirmar():
     for prod, cant in detalles_a_guardar:
         detalle = DetalleVenta(idventa=venta.idventa, idproducto=prod.idproducto, cantidad=cant)
         db.session.add(detalle)
-        prod.stock -= cant
 
     db.session.commit()
     session['ultimo_pedido'] = venta.idventa
@@ -132,12 +149,22 @@ def confirmar():
 @cliente_bp.route('/factura/<int:idventa>')
 def factura(idventa):
     venta = Venta.query.get_or_404(idventa)
+    es_propietario = 'cliente_doc' in session and session['cliente_doc'] == venta.cliente
+    es_admin = current_user.is_authenticated
+    if not es_propietario and not es_admin:
+        flash('No tienes acceso a este pedido.', 'danger')
+        return redirect(url_for('cliente.registro'))
     return render_template('cliente/factura.html', venta=venta)
 
 
 @cliente_bp.route('/estado/<int:idventa>')
 def estado_pedido(idventa):
     venta = Venta.query.get_or_404(idventa)
+    es_propietario = 'cliente_doc' in session and session['cliente_doc'] == venta.cliente
+    es_admin = current_user.is_authenticated
+    if not es_propietario and not es_admin:
+        flash('No tienes acceso a este pedido.', 'danger')
+        return redirect(url_for('cliente.registro'))
     return render_template('cliente/estado_pedido.html', venta=venta)
 
 

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import os
 import shutil
 import uuid
-from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario
+from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte
 from . import admin_bp
 
 
@@ -51,8 +51,6 @@ def _get_library_images():
         f for f in os.listdir(lib_dir)
         if '.' in f and f.rsplit('.', 1)[1].lower() in allowed and f != '.gitkeep'
     ])
-
-
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
@@ -159,10 +157,14 @@ def productos():
 @login_required
 def producto_nuevo():
     nombre = request.form.get('nombre', '').strip()
-    precio = request.form.get('precio', 0)
-    stock  = request.form.get('stock', 0)
     if not nombre:
         flash('El nombre es obligatorio.', 'danger')
+        return redirect(url_for('admin_panel.productos'))
+    try:
+        precio = int(request.form.get('precio', 0))
+        stock = int(request.form.get('stock', 0))
+    except (ValueError, TypeError):
+        flash('Precio y stock deben ser valores numericos.', 'danger')
         return redirect(url_for('admin_panel.productos'))
     imagen = None
     # Opción 1: subir nueva imagen
@@ -180,7 +182,7 @@ def producto_nuevo():
                 os.makedirs(dest_dir, exist_ok=True)
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
                 imagen = lib_image
-    prod = Producto(nombre=nombre, precio=int(precio), stock=int(stock), imagen=imagen)
+    prod = Producto(nombre=nombre, precio=precio, stock=stock, imagen=imagen)
     db.session.add(prod)
     db.session.commit()
     flash(f'Producto "{nombre}" creado correctamente.', 'success')
@@ -192,8 +194,12 @@ def producto_nuevo():
 def producto_editar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     prod.nombre = request.form.get('nombre', prod.nombre).strip()
-    prod.precio = int(request.form.get('precio', prod.precio))
-    prod.stock  = int(request.form.get('stock', prod.stock))
+    try:
+        prod.precio = int(request.form.get('precio', prod.precio))
+        prod.stock  = int(request.form.get('stock', prod.stock))
+    except (ValueError, TypeError):
+        flash('Precio y stock deben ser valores numericos.', 'danger')
+        return redirect(url_for('admin_panel.productos'))
     # Opción 1: subir nueva imagen
     new_image = request.files.get('imagen')
     if new_image and new_image.filename:
@@ -228,7 +234,11 @@ def producto_eliminar(idproducto):
 @login_required
 def producto_baja(idproducto):
     prod = Producto.query.get_or_404(idproducto)
-    cantidad = int(request.form.get('cantidad', 0))
+    try:
+        cantidad = int(request.form.get('cantidad', 0))
+    except (ValueError, TypeError):
+        flash('La cantidad debe ser un valor numerico.', 'danger')
+        return redirect(url_for('admin_panel.productos'))
     motivo = request.form.get('motivo', '').strip()
     
     if cantidad <= 0 or not motivo:
@@ -464,16 +474,6 @@ def ventas():
 
     ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15)
 
-    # Pre-compute order number per day to avoid N+1
-    numero_map = {}
-    for v in ventas.items:
-        key = str(v.fechaventa)
-        if key not in numero_map:
-            numero_map[key] = db.session.query(func.count(Venta.idventa)).filter(
-                Venta.fechaventa == v.fechaventa
-            ).scalar()
-        v._num_pedido_dia = numero_map[key]
-
     # Recompute sequential number: within each day, order by id asc
     nums_dia = {}
     for v in ventas.items:
@@ -517,6 +517,33 @@ def venta_rechazar(idventa):
     return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
 
 
+# ── Cambio de estado en ventas ────────────────────────────────────────────────
+@admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
+@login_required
+def venta_preparado(idventa):
+    venta = Venta.query.get_or_404(idventa)
+    if venta.estado == 'Pagado/Preparando':
+        venta.estado = 'Preparado'
+        db.session.commit()
+        flash(f'Pedido #{idventa} marcado como preparado.', 'success')
+    else:
+        flash('Solo se pueden preparar pedidos en estado Pagado/Preparando.', 'warning')
+    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
+
+
+@admin_bp.route('/ventas/entregado/<int:idventa>', methods=['POST'])
+@login_required
+def venta_entregado(idventa):
+    venta = Venta.query.get_or_404(idventa)
+    if venta.estado in ('Pagado/Preparando', 'Preparado'):
+        venta.estado = 'Entregado'
+        db.session.commit()
+        flash(f'Pedido #{idventa} marcado como entregado.', 'success')
+    else:
+        flash('No se puede entregar este pedido.', 'warning')
+    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
+
+
 # ── Compras / Abastecimiento ──────────────────────────────────────────────────
 @admin_bp.route('/compras')
 @login_required
@@ -543,10 +570,15 @@ def compra_nueva():
     total = 0
     detalles = []
     for pid, cant in zip(items, cantidades):
-        prod = Producto.query.get(int(pid))
-        if prod and int(cant) > 0:
-            total += prod.precio * int(cant)
-            detalles.append((prod, int(cant)))
+        try:
+            pid_int = int(pid)
+            cant_int = int(cant)
+        except (ValueError, TypeError):
+            continue
+        prod = Producto.query.get(pid_int)
+        if prod and cant_int > 0:
+            total += prod.precio * cant_int
+            detalles.append((prod, cant_int))
 
     compra = Compra(
         nombrevendedor = vendedor,
@@ -565,33 +597,6 @@ def compra_nueva():
     db.session.commit()
     flash('Compra registrada y stock actualizado.', 'success')
     return redirect(url_for('admin_panel.compras'))
-
-
-# ── Cambio de estado en ventas ────────────────────────────────────────────────
-@admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
-@login_required
-def venta_preparado(idventa):
-    venta = Venta.query.get_or_404(idventa)
-    if venta.estado == 'Pagado/Preparando':
-        venta.estado = 'Preparado'
-        db.session.commit()
-        flash(f'Pedido #{idventa} marcado como preparado.', 'success')
-    else:
-        flash('Solo se pueden preparar pedidos en estado Pagado/Preparando.', 'warning')
-    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
-
-
-@admin_bp.route('/ventas/entregado/<int:idventa>', methods=['POST'])
-@login_required
-def venta_entregado(idventa):
-    venta = Venta.query.get_or_404(idventa)
-    if venta.estado in ('Pagado/Preparando', 'Preparado'):
-        venta.estado = 'Entregado'
-        db.session.commit()
-        flash(f'Pedido #{idventa} marcado como entregado.', 'success')
-    else:
-        flash('No se puede entregar este pedido.', 'warning')
-    return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
 
 
 # ── Reportes ──────────────────────────────────────────────────────────────────

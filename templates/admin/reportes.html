@@ -7,11 +7,6 @@
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
       <i class="bi bi-clipboard2-data me-2"></i>Reportes
     </h4>
-<<<<<<< Updated upstream
-    <button class="btn btn-sena btn-sm" data-bs-toggle="modal" data-bs-target="#modalCrearReporte">
-      <i class="bi bi-plus-circle me-1"></i>Nuevo Reporte
-    </button>
-=======
     <div class="d-flex gap-2">
       <a href="{{ url_for('admin_panel.reportes_excel') }}" class="btn btn-outline-success btn-sm">
         <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
@@ -20,7 +15,6 @@
         <i class="bi bi-plus-circle me-1"></i>Nuevo Reporte
       </button>
     </div>
->>>>>>> Stashed changes
   </div>
 
   <!-- Lista de reportes -->
@@ -93,6 +87,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="POST" action="{{ url_for('admin_panel.reporte_crear') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="modal-header card-header-sena">
           <h5 class="modal-title" id="modalCrearReporteLabel">
             <i class="bi bi-clipboard2-plus me-2"></i>Nuevo Reporte
