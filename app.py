@@ -3,7 +3,7 @@ from flask import Flask, redirect, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
-from models import db, Admin
+from models import db, Admin, Personal
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 
@@ -34,10 +34,13 @@ def create_app(config_name='default'):
     from blueprints.cliente   import cliente_bp
     from blueprints.empleados import empleados_bp
     from blueprints.admin     import admin_bp
+    from blueprints.permisos  import registrar_context_processor
 
     app.register_blueprint(cliente_bp)
     app.register_blueprint(empleados_bp)
     app.register_blueprint(admin_bp)
+
+    registrar_context_processor(app)
 
     @app.route('/')
     def index():
@@ -55,7 +58,13 @@ def create_app(config_name='default'):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Admin.query.get(int(user_id))
+    if ':' in user_id:
+        tipo, doc = user_id.split(':', 1)
+        if tipo == 'admin':
+            return Admin.query.get(int(doc))
+        elif tipo == 'personal':
+            return Personal.query.get(int(doc))
+    return None
 
 
 def _migrar_esquema():

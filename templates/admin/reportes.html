@@ -3,7 +3,7 @@
 
 {% block admin_content %}
 <div class="container-fluid py-3">
-  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
       <i class="bi bi-clipboard2-data me-2"></i>Reportes
     </h4>
@@ -11,9 +11,11 @@
       <a href="{{ url_for('admin_panel.reportes_excel') }}" class="btn btn-outline-success btn-sm">
         <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
       </a>
+      {% if puede('generar_reporte') %}
       <button class="btn btn-sena btn-sm" data-bs-toggle="modal" data-bs-target="#modalCrearReporte">
         <i class="bi bi-plus-circle me-1"></i>Nuevo Reporte
       </button>
+      {% endif %}
     </div>
   </div>
 
@@ -32,7 +34,7 @@
             </div>
             <div>
               <div class="fw-semibold">{{ r.prod_rel.nombre if r.prod_rel else 'N/A' }}</div>
-              <small class="text-muted">Admin: {{ r.admin_rel.nombre if r.admin_rel else 'N/A' }} &middot; Doc: {{ r.idadmin }}</small>
+              <small class="text-muted">Creado por: Doc {{ r.idadmin }}</small>
             </div>
           </div>
           <div class="text-end">
@@ -82,6 +84,7 @@
   {% endif %}
 </div>
 
+{% if puede('generar_reporte') %}
 <!-- Modal: Crear Reporte -->
 <div class="modal fade" id="modalCrearReporte" tabindex="-1" aria-labelledby="modalCrearReporteLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -112,7 +115,11 @@
           <div class="mb-3">
             <small class="text-muted">
               <i class="bi bi-info-circle me-1"></i>
+              {% if tipo_usuario_actual() == 'admin' %}
               Admin: {{ current_user.nombre }} ({{ current_user.documento }})
+              {% else %}
+              Personal: {{ current_user.nombre }} ({{ current_user.docpersonal }})
+              {% endif %}
             </small>
           </div>
         </div>
@@ -126,4 +133,5 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}

@@ -44,26 +44,29 @@ def catalogo():
     if 'cliente_doc' not in session and not current_user.is_authenticated:
         return redirect(url_for('cliente.registro'))
         
-    from sqlalchemy import func, cast, Date
-    from datetime import datetime, timedelta
+    from sqlalchemy import func, case
     
     estados_pagados = ('Pagado/Preparando', 'Preparado', 'Entregado')
-    hoy = datetime.utcnow().date()
     
-    # Obtener cantidad vendida por producto (solo pedidos pagados/entregados)
+    # Obtener cantidad vendida por producto.
+    # Se usa CASE dentro de SUM para contar solo ventas con estado válido,
+    # de modo que TODOS los productos aparecen siempre (con 0 si no tienen
+    # ventas calificadas). Así se evita que un producto con solo ventas
+    # 'Pendiente de Pago' o 'Cancelado' desaparezca del catálogo.
     rows = db.session.query(
         Producto.idproducto,
-        func.coalesce(func.sum(DetalleVenta.cantidad), 0).label('total_vendido')
-    ).outerjoin(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto) \
+        func.coalesce(
+            func.sum(case((Venta.estado.in_(estados_pagados), DetalleVenta.cantidad), else_=0)),
+            0
+        ).label('total_vendido')
+    ).select_from(Producto) \
+     .outerjoin(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto) \
      .outerjoin(Venta, Venta.idventa == DetalleVenta.idventa) \
-     .filter(
-         db.or_(
-             Venta.estado.in_(estados_pagados),
-             DetalleVenta.idventa.is_(None)
-         )
-     ) \
      .group_by(Producto.idproducto) \
-     .order_by(func.coalesce(func.sum(DetalleVenta.cantidad), 0).desc()).all()
+     .order_by(func.coalesce(
+         func.sum(case((Venta.estado.in_(estados_pagados), DetalleVenta.cantidad), else_=0)),
+         0
+     ).desc()).all()
     
     # Separar: top 10 más vendidos y el resto
     mapa_ventas = {r.idproducto: int(r.total_vendido) for r in rows}
@@ -94,7 +97,9 @@ def confirmar():
     if 'cliente_doc' not in session:
         return jsonify({'error': 'Sesion expirada'}), 403
 
-    data  = request.get_json()
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'error': 'Cuerpo de petición inválido'}), 400
     items = data.get('items', [])
     if not items:
         return jsonify({'error': 'Carrito vacio'}), 400

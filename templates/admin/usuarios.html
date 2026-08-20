@@ -12,6 +12,10 @@
     </button>
   </div>
 
+  <!-- Sección: Administradores -->
+  <h5 class="fw-bold mt-3 mb-2" style="color:var(--sena-green)">
+    <i class="bi bi-shield-lock me-1"></i>Administradores
+  </h5>
   <div class="table-responsive">
     <table class="table table-hover table-sena align-middle">
       <thead>
@@ -27,19 +31,67 @@
           <td>{{ a.email }}</td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre }}', '{{ a.email }}')">
+                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre }}', '{{ a.email }}', 'admin', '')">
               <i class="bi bi-pencil"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=a.documento) }}"
                   class="d-inline"
                   onsubmit="return confirm('¿Eliminar al usuario {{ a.nombre }}?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="tipo_cuenta" value="admin"/>
               <button type="submit" class="btn btn-outline-danger btn-sm">
                 <i class="bi bi-trash3"></i>
               </button>
             </form>
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted">No hay administradores registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Sección: Personal -->
+  <h5 class="fw-bold mt-4 mb-2" style="color:var(--sena-green)">
+    <i class="bi bi-person-badge me-1"></i>Personal
+  </h5>
+  <div class="table-responsive">
+    <table class="table table-hover table-sena align-middle">
+      <thead>
+        <tr>
+          <th>Documento</th><th>Nombre</th><th>Correo</th><th>Rol</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in personal_list %}
+        <tr>
+          <td class="text-muted small">{{ p.docpersonal }}</td>
+          <td class="fw-semibold">{{ p.nombre }}</td>
+          <td>{{ p.email }}</td>
+          <td>
+            <span class="badge {% if p.rol == 'auditor' %}bg-info{% elif p.rol == 'cajero' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
+              {{ p.rol|capitalize }}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-outline-primary btn-sm me-1"
+                    onclick="abrirEditarUser({{ p.docpersonal }}, '{{ p.nombre }}', '{{ p.email }}', 'personal', '{{ p.rol }}')">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=p.docpersonal) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('¿Eliminar al personal {{ p.nombre }}?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="tipo_cuenta" value="personal"/>
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted">No hay personal registrado.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -57,7 +109,33 @@
       <form method="POST" action="{{ url_for('admin_panel.usuario_nuevo') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="modal-body">
-          {% include 'admin/_form_usuario.html' with context %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tipo de cuenta</label>
+            <select class="form-select" name="tipo_cuenta" id="nuevoTipoCuenta" onchange="toggleRolPersonal(this, 'nuevo')">
+              <option value="admin">Administrador</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
+          <div class="mb-3" id="nuevo-rol-personal" style="display:none">
+            <label class="form-label fw-semibold">Rol del personal</label>
+            <select class="form-select" name="rol_personal">
+              <option value="cajero">Cajero</option>
+              <option value="auditor">Auditor</option>
+              <option value="despachador">Despachador</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Documento</label>
+            <input type="number" class="form-control" name="documento" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nombre completo</label>
+            <input type="text" class="form-control" name="nombre" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Correo electrónico</label>
+            <input type="email" class="form-control" name="email" required>
+          </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">Contraseña</label>
             <input type="password" class="form-control" name="clave" required minlength="6">
@@ -82,8 +160,24 @@
       </div>
       <form method="POST" id="formEditarUser">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="tipo_cuenta" id="editarTipoCuenta" value="admin"/>
         <div class="modal-body">
-          {% include 'admin/_form_usuario.html' with context %}
+          <div id="editar-rol-personal" style="display:none" class="mb-3">
+            <label class="form-label fw-semibold">Rol del personal</label>
+            <select class="form-select" name="rol_personal" id="editarRolPersonal">
+              <option value="cajero">Cajero</option>
+              <option value="auditor">Auditor</option>
+              <option value="despachador">Despachador</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nombre completo</label>
+            <input type="text" class="form-control" name="nombre" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Correo electrónico</label>
+            <input type="email" class="form-control" name="email" required>
+          </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">Nueva Contraseña <small class="text-muted">(dejar vacío para no cambiar)</small></label>
             <input type="password" class="form-control" name="clave" minlength="6">
@@ -101,11 +195,26 @@
 
 {% block extra_js %}
 <script>
-function abrirEditarUser(doc, nombre, email) {
-  const form = document.getElementById('formEditarUser');
-  form.action = `/admin/usuarios/editar/${doc}`;
+function toggleRolPersonal(selectEl, prefix) {
+  var rolDiv = document.getElementById(prefix + '-rol-personal');
+  if (rolDiv) {
+    rolDiv.style.display = selectEl.value === 'personal' ? 'block' : 'none';
+  }
+}
+
+function abrirEditarUser(doc, nombre, email, tipo, rol) {
+  var form = document.getElementById('formEditarUser');
+  form.action = '/admin/usuarios/editar/' + doc;
   form.querySelector('[name=nombre]').value = nombre;
   form.querySelector('[name=email]').value  = email;
+  document.getElementById('editarTipoCuenta').value = tipo;
+  var rolDiv = document.getElementById('editar-rol-personal');
+  if (tipo === 'personal') {
+    rolDiv.style.display = 'block';
+    document.getElementById('editarRolPersonal').value = rol || 'cajero';
+  } else {
+    rolDiv.style.display = 'none';
+  }
   new bootstrap.Modal('#modalEditarUser').show();
 }
 </script>

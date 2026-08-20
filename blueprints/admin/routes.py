@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 import os
 import shutil
 import uuid
-from models import db, Producto, Admin, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte
+from models import db, Producto, Admin, Personal, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte
+from blueprints.permisos import requiere_permiso, requiere_ver_pagina
 from . import admin_bp
 
 
@@ -56,6 +57,7 @@ def _get_library_images():
 # ── Dashboard ────────────────────────────────────────────────────────────────
 @admin_bp.route('/')
 @login_required
+@requiere_ver_pagina('dashboard')
 def dashboard():
     from sqlalchemy import func, cast, Date, desc, case
 
@@ -94,8 +96,13 @@ def dashboard():
 
     # ── Ventas mensuales (últimos 12 meses) — solo pagados/entregados ──
     desde_meses = hoy - timedelta(days=365)
+    is_sqlite = db.engine.url.drivername.startswith('sqlite')
+    if is_sqlite:
+        mes_col = func.strftime('%Y-%m', Venta.fechaventa)
+    else:
+        mes_col = func.date_trunc('month', Venta.fechaventa)
     rows_mensuales = db.session.query(
-        func.date_trunc('month', Venta.fechaventa).label('mes'),
+        mes_col.label('mes'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
         cast(Venta.fechaventa, Date) >= desde_meses,
@@ -103,7 +110,7 @@ def dashboard():
     ).group_by('mes').order_by('mes').all()
     mapa_meses = {}
     for r in rows_mensuales:
-        clave = r.mes.strftime('%Y-%m') if r.mes else ''
+        clave = r.mes if isinstance(r.mes, str) else (r.mes.strftime('%Y-%m') if r.mes else '')
         mapa_meses[clave] = int(r.total)
     ventas_mensuales = []
     etiquetas_meses = []
@@ -147,6 +154,7 @@ def dashboard():
 # ── CRUD Productos ────────────────────────────────────────────────────────────
 @admin_bp.route('/productos')
 @login_required
+@requiere_ver_pagina('productos')
 def productos():
     prods = Producto.query.order_by(Producto.idproducto).all()
     imagenes = _get_library_images()
@@ -155,6 +163,7 @@ def productos():
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def producto_nuevo():
     nombre = request.form.get('nombre', '').strip()
     if not nombre:
@@ -191,6 +200,7 @@ def producto_nuevo():
 
 @admin_bp.route('/productos/editar/<int:idproducto>', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def producto_editar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     prod.nombre = request.form.get('nombre', prod.nombre).strip()
@@ -222,6 +232,7 @@ def producto_editar(idproducto):
 
 @admin_bp.route('/productos/eliminar/<int:idproducto>', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     _delete_image(prod.imagen)
@@ -232,6 +243,7 @@ def producto_eliminar(idproducto):
 
 @admin_bp.route('/productos/baja/<int:idproducto>', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def producto_baja(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     try:
@@ -261,6 +273,7 @@ def producto_baja(idproducto):
 # ── API: Imágenes de biblioteca ──────────────────────────────────────────────
 @admin_bp.route('/productos/imagenes')
 @login_required
+@requiere_permiso('escribir_todo')
 def productos_imagenes():
     """Retorna JSON con las imágenes disponibles en la biblioteca."""
     imagenes = _get_library_images()
@@ -269,6 +282,7 @@ def productos_imagenes():
 
 @admin_bp.route('/productos/excel')
 @login_required
+@requiere_ver_pagina('productos')
 def productos_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -322,6 +336,7 @@ def productos_excel():
 
 @admin_bp.route('/ventas/excel')
 @login_required
+@requiere_ver_pagina('ventas')
 def ventas_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -387,67 +402,114 @@ def ventas_excel():
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
-# ── Gestión de usuarios (Admin) ───────────────────────────────────────────────
+# ── Gestión de usuarios (Admin + Personal) ───────────────────────────────────
 @admin_bp.route('/usuarios')
 @login_required
+@requiere_ver_pagina('usuarios')
 def usuarios():
     admins = Admin.query.order_by(Admin.documento).all()
-    return render_template('admin/usuarios.html', admins=admins)
+    personal_list = Personal.query.order_by(Personal.docpersonal).all()
+    return render_template('admin/usuarios.html', admins=admins, personal_list=personal_list)
 
 
 @admin_bp.route('/usuarios/nuevo', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def usuario_nuevo():
+    tipo_cuenta = request.form.get('tipo_cuenta', 'admin')
     doc    = request.form.get('documento', '').strip()
     nombre = request.form.get('nombre', '').strip()
     email  = request.form.get('email', '').strip()
     clave  = request.form.get('clave', '').strip()
+
     if not all([doc, nombre, email, clave]):
         flash('Todos los campos son obligatorios.', 'danger')
         return redirect(url_for('admin_panel.usuarios'))
 
-    if Admin.query.filter_by(email=email).first():
-        flash('Ya existe un usuario con ese correo.', 'danger')
-        return redirect(url_for('admin_panel.usuarios'))
+    if tipo_cuenta == 'personal':
+        rol = request.form.get('rol_personal', 'cajero')
+        if Personal.query.filter_by(email=email).first():
+            flash('Ya existe un personal con ese correo.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        if Personal.query.filter_by(docpersonal=int(doc)).first():
+            flash('Ya existe un personal con ese documento.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        p = Personal(docpersonal=int(doc), nombre=nombre, email=email, clave='', rol=rol)
+        p.set_password(clave)
+        db.session.add(p)
+        db.session.commit()
+        flash(f'Personal "{nombre}" creado correctamente.', 'success')
+    else:
+        if Admin.query.filter_by(email=email).first():
+            flash('Ya existe un usuario con ese correo.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        admin = Admin(documento=int(doc), nombre=nombre, email=email, clave='')
+        admin.set_password(clave)
+        db.session.add(admin)
+        db.session.commit()
+        flash(f'Usuario "{nombre}" creado correctamente.', 'success')
 
-    admin = Admin(documento=int(doc), nombre=nombre, email=email, clave='')
-    admin.set_password(clave)
-    db.session.add(admin)
-    db.session.commit()
-    flash(f'Usuario "{nombre}" creado correctamente.', 'success')
     return redirect(url_for('admin_panel.usuarios'))
 
 
 @admin_bp.route('/usuarios/editar/<int:documento>', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def usuario_editar(documento):
-    admin  = Admin.query.get_or_404(documento)
-    admin.nombre = request.form.get('nombre', admin.nombre).strip()
-    admin.email  = request.form.get('email', admin.email).strip()
-    nueva_clave  = request.form.get('clave', '').strip()
-    if nueva_clave:
-        admin.set_password(nueva_clave)
-    db.session.commit()
-    flash('Usuario actualizado correctamente.', 'success')
+    tipo_cuenta = request.form.get('tipo_cuenta', 'admin')
+
+    if tipo_cuenta == 'personal':
+        p = Personal.query.get_or_404(documento)
+        p.nombre = request.form.get('nombre', p.nombre).strip()
+        p.email  = request.form.get('email', p.email).strip()
+        nuevo_rol = request.form.get('rol_personal', '').strip()
+        if nuevo_rol:
+            p.rol = nuevo_rol
+        nueva_clave = request.form.get('clave', '').strip()
+        if nueva_clave:
+            p.set_password(nueva_clave)
+        db.session.commit()
+        flash('Personal actualizado correctamente.', 'success')
+    else:
+        admin = Admin.query.get_or_404(documento)
+        admin.nombre = request.form.get('nombre', admin.nombre).strip()
+        admin.email  = request.form.get('email', admin.email).strip()
+        nueva_clave  = request.form.get('clave', '').strip()
+        if nueva_clave:
+            admin.set_password(nueva_clave)
+        db.session.commit()
+        flash('Usuario actualizado correctamente.', 'success')
+
     return redirect(url_for('admin_panel.usuarios'))
 
 
 @admin_bp.route('/usuarios/eliminar/<int:documento>', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def usuario_eliminar(documento):
-    if documento == current_user.documento:
-        flash('No puedes eliminar tu propio usuario.', 'danger')
-        return redirect(url_for('admin_panel.usuarios'))
-    admin = Admin.query.get_or_404(documento)
-    db.session.delete(admin)
-    db.session.commit()
-    flash('Usuario eliminado.', 'warning')
+    tipo_cuenta = request.form.get('tipo_cuenta', 'admin')
+
+    if tipo_cuenta == 'personal':
+        p = Personal.query.get_or_404(documento)
+        db.session.delete(p)
+        db.session.commit()
+        flash('Personal eliminado.', 'warning')
+    else:
+        if documento == current_user.documento:
+            flash('No puedes eliminar tu propio usuario.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        admin = Admin.query.get_or_404(documento)
+        db.session.delete(admin)
+        db.session.commit()
+        flash('Usuario eliminado.', 'warning')
+
     return redirect(url_for('admin_panel.usuarios'))
 
 
 # ── Histórico de ventas ───────────────────────────────────────────────────────
 @admin_bp.route('/ventas')
 @login_required
+@requiere_ver_pagina('ventas')
 def ventas():
     from sqlalchemy import func, cast, Date
 
@@ -472,7 +534,7 @@ def ventas():
         desde = hoy.replace(month=1, day=1)
         query = query.filter(cast(Venta.fechaventa, Date) >= desde)
 
-    ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15)
+    ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15, error_out=False)
 
     # Recompute sequential number: within each day, order by id asc
     nums_dia = {}
@@ -488,6 +550,7 @@ def ventas():
 
 @admin_bp.route('/ventas/aceptar/<int:idventa>', methods=['POST'])
 @login_required
+@requiere_permiso('aceptar_rechazar_venta')
 def venta_aceptar(idventa):
     venta = Venta.query.get_or_404(idventa)
     if venta.estado == 'Pendiente de Pago':
@@ -501,6 +564,7 @@ def venta_aceptar(idventa):
 
 @admin_bp.route('/ventas/rechazar/<int:idventa>', methods=['POST'])
 @login_required
+@requiere_permiso('aceptar_rechazar_venta')
 def venta_rechazar(idventa):
     venta = Venta.query.get_or_404(idventa)
     if venta.estado == 'Pendiente de Pago':
@@ -520,6 +584,7 @@ def venta_rechazar(idventa):
 # ── Cambio de estado en ventas ────────────────────────────────────────────────
 @admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
 @login_required
+@requiere_permiso('cambiar_estado_entrega')
 def venta_preparado(idventa):
     venta = Venta.query.get_or_404(idventa)
     if venta.estado == 'Pagado/Preparando':
@@ -533,6 +598,7 @@ def venta_preparado(idventa):
 
 @admin_bp.route('/ventas/entregado/<int:idventa>', methods=['POST'])
 @login_required
+@requiere_permiso('cambiar_estado_entrega')
 def venta_entregado(idventa):
     venta = Venta.query.get_or_404(idventa)
     if venta.estado in ('Pagado/Preparando', 'Preparado'):
@@ -547,17 +613,19 @@ def venta_entregado(idventa):
 # ── Compras / Abastecimiento ──────────────────────────────────────────────────
 @admin_bp.route('/compras')
 @login_required
+@requiere_ver_pagina('compras')
 def compras():
     page    = request.args.get('page', 1, type=int)
     compras = (Compra.query
                .order_by(Compra.fechacompra.desc())
-               .paginate(page=page, per_page=20))
+               .paginate(page=page, per_page=20, error_out=False))
     productos = Producto.query.order_by(Producto.nombre).all()
     return render_template('admin/compras.html', compras=compras, productos=productos)
 
 
 @admin_bp.route('/compras/nueva', methods=['POST'])
 @login_required
+@requiere_permiso('escribir_todo')
 def compra_nueva():
     vendedor = request.form.get('nombrevendedor', '').strip()
     items    = request.form.getlist('idproducto[]')
@@ -602,19 +670,20 @@ def compra_nueva():
 # ── Reportes ──────────────────────────────────────────────────────────────────
 @admin_bp.route('/reportes')
 @login_required
+@requiere_ver_pagina('reportes')
 def reportes():
     page = request.args.get('page', 1, type=int)
     reportes_q = (Reporte.query
-                  .options(db.joinedload(Reporte.admin_rel),
-                           db.joinedload(Reporte.prod_rel))
+                  .options(db.joinedload(Reporte.prod_rel))
                   .order_by(Reporte.idreporte.desc())
-                  .paginate(page=page, per_page=15))
+                  .paginate(page=page, per_page=15, error_out=False))
     productos = Producto.query.order_by(Producto.nombre).all()
     return render_template('admin/reportes.html', reportes=reportes_q, productos=productos)
 
 
 @admin_bp.route('/reportes/crear', methods=['POST'])
 @login_required
+@requiere_permiso('generar_reporte')
 def reporte_crear():
     descripcion = request.form.get('descripcion', '').strip()
     idproducto  = request.form.get('idproducto', '', type=int)
@@ -628,8 +697,14 @@ def reporte_crear():
         flash('Producto no encontrado.', 'danger')
         return redirect(url_for('admin_panel.reportes'))
 
+    uid = current_user.get_id()
+    if uid.startswith('admin:'):
+        id_creador = current_user.documento
+    else:
+        id_creador = current_user.docpersonal
+
     reporte = Reporte(
-        idadmin     = current_user.documento,
+        idadmin     = id_creador,
         descripcion = descripcion or None,
         fecha       = datetime.utcnow(),
         producto    = idproducto
@@ -642,14 +717,14 @@ def reporte_crear():
 
 @admin_bp.route('/reportes/excel')
 @login_required
+@requiere_ver_pagina('reportes')
 def reportes_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
     reportes = (Reporte.query
-                .options(db.joinedload(Reporte.admin_rel),
-                         db.joinedload(Reporte.prod_rel))
+                .options(db.joinedload(Reporte.prod_rel))
                 .order_by(Reporte.idreporte.desc())
                 .all())
 
@@ -674,9 +749,10 @@ def reportes_excel():
         cell.border = thin_border
 
     for row_idx, r in enumerate(reportes, 2):
+        admin_user = Admin.query.get(r.idadmin)
         ws.cell(row=row_idx, column=1, value=r.idreporte).border = thin_border
         ws.cell(row=row_idx, column=2, value=r.idadmin).border = thin_border
-        ws.cell(row=row_idx, column=3, value=r.admin_rel.nombre if r.admin_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=3, value=admin_user.nombre if admin_user else '').border = thin_border
         ws.cell(row=row_idx, column=4, value=r.prod_rel.nombre if r.prod_rel else '').border = thin_border
         ws.cell(row=row_idx, column=5, value=r.descripcion or '').border = thin_border
         ws.cell(row=row_idx, column=6, value=r.fecha.strftime('%d/%m/%Y') if r.fecha else '').border = thin_border

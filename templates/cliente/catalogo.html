@@ -10,46 +10,6 @@
 </style>
 {% endblock %}
 
-{% block nav_links %}
-  <li class="nav-item">
-    <a class="nav-link active" href="{{ url_for('cliente.catalogo') }}">
-      <i class="bi bi-grid me-1"></i>Menú
-    </a>
-  </li>
-  {% if current_user.is_authenticated %}
-  <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('admin_panel.dashboard') }}">
-      <i class="bi bi-speedometer2 me-1"></i>Dashboard
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('admin_panel.productos') }}">
-      <i class="bi bi-box-seam me-1"></i>Inventario
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('admin_panel.ventas') }}">
-      <i class="bi bi-graph-up me-1"></i>Ventas
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('admin_panel.compras') }}">
-      <i class="bi bi-truck me-1"></i>Compras
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('admin_panel.usuarios') }}">
-      <i class="bi bi-people me-1"></i>Usuarios
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('admin_panel.reportes') }}">
-      <i class="bi bi-clipboard2-data me-1"></i>Reportes
-    </a>
-  </li>
-  {% endif %}
-{% endblock %}
-
 {% block content %}
 <div class="container py-3" style="max-width:960px">
 

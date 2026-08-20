@@ -110,14 +110,29 @@ class Admin(UserMixin, db.Model):
     clave     = db.Column(db.String(256), nullable=False)
     email     = db.Column(db.String(120), unique=True, nullable=False)
     rol       = db.Column(db.String(20), nullable=False, default='admin')
-    # La columna 'rol' existe pero actualmente no se usa para control de acceso;
-    # todos los Admin autenticados tienen el mismo acceso. Se conserva por si se
-    # retoma diferenciación de roles en el futuro.
 
     compras = db.relationship('Compra', back_populates='admin_rel')
 
     def get_id(self):
-        return str(self.documento)
+        return f'admin:{self.documento}'
+
+    def set_password(self, password):
+        self.clave = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.clave, password)
+
+
+class Personal(UserMixin, db.Model):
+    __tablename__ = 'personal'
+    docpersonal = db.Column(db.Integer, primary_key=True)
+    nombre      = db.Column(db.String(50))
+    clave       = db.Column(db.String(255))
+    email       = db.Column(db.String(30))
+    rol         = db.Column(db.String(15))
+
+    def get_id(self):
+        return f'personal:{self.docpersonal}'
 
     def set_password(self, password):
         self.clave = generate_password_hash(password)
@@ -178,12 +193,11 @@ class BajaInventario(db.Model):
 class Reporte(db.Model):
     __tablename__ = 'reporte'
     idreporte   = db.Column(db.Integer, primary_key=True)
-    idadmin     = db.Column(db.Integer, db.ForeignKey('admin.documento'), nullable=False)
+    idadmin     = db.Column(db.Integer, nullable=False)
     descripcion = db.Column(db.String(255), nullable=True)
     fecha       = db.Column(db.Date, nullable=True, default=datetime.utcnow)
     producto    = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
 
-    admin_rel = db.relationship('Admin',    backref='reportes')
     prod_rel  = db.relationship('Producto', backref='reportes')
 
     def to_dict(self):
