@@ -26,6 +26,8 @@
           <th class="text-center" style="width:64px">Imagen</th>
           <th>Producto</th>
           <th class="text-center">Precio</th>
+          <th class="text-center">Costo</th>
+          <th class="text-center">Margen</th>
           <th class="text-center">Stock</th>
           <th>Acciones</th>
         </tr>
@@ -47,6 +49,15 @@
           </td>
           <td class="fw-semibold">{{ p.nombre }}</td>
           <td class="text-center fw-semibold">${{ "{:,}".format(p.precio) }}</td>
+          <td class="text-center">${{ "{:,}".format(p.costo) }}</td>
+          <td class="text-center">
+            {% set margen = p.precio - p.costo %}
+            {% if margen > 0 %}
+              <span class="text-success">${{ "{:,}".format(margen) }}</span>
+            {% else %}
+              <span class="text-muted">${{ "{:,}".format(margen) }}</span>
+            {% endif %}
+          </td>
           <td class="text-center">
             {% if p.estado == 'En stock' %}
               <span class="badge bg-success">{{ p.stock }} en stock</span>
@@ -61,7 +72,7 @@
           <td>
             {% if puede('escribir_todo') %}
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre|e }}', {{ p.precio }}, {{ p.stock }}, '{{ p.imagen or '' }}')" title="Editar">
+                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre|e }}', {{ p.precio }}, {{ p.stock }}, '{{ p.imagen or '' }}', {{ p.costo }}, {{ p.stock_minimo }})" title="Editar">
               <i class="bi bi-pencil"></i>
             </button>
             <button class="btn btn-outline-warning btn-sm me-1"
@@ -174,12 +185,14 @@
 
 {% block extra_js %}
 <script>
-function abrirEditar(id, nombre, precio, stock, imagen) {
+function abrirEditar(id, nombre, precio, stock, imagen, costo, stockMinimo) {
   var form = document.getElementById('formEditar');
   form.action = '/admin/productos/editar/' + id;
   form.querySelector('[name=nombre]').value = nombre;
   form.querySelector('[name=precio]').value = precio;
   form.querySelector('[name=stock]').value  = stock;
+  form.querySelector('[name=costo]').value  = costo;
+  form.querySelector('[name=stock_minimo]').value = stockMinimo;
   var hiddenLib = form.querySelector('[name=imagen_biblioteca]');
   if (hiddenLib) hiddenLib.value = '';
   var fileInput = form.querySelector('input[type=file]');

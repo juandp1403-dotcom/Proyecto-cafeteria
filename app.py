@@ -104,6 +104,14 @@ def _migrar_esquema():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # Agregar columna stock_minimo a producto si no existe
+    try:
+        db.session.execute(text(
+            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INT NOT NULL DEFAULT 10"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _seed_datos_iniciales():

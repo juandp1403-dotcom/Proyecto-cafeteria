@@ -74,7 +74,7 @@ def dashboard():
         Venta.estado.in_(estados_pagados)
     ).scalar())
 
-    productos_bajo = Producto.query.filter(Producto.stock < 10, Producto.stock > 0).order_by(Producto.stock.asc()).all()
+    productos_bajo = Producto.query.filter(Producto.stock < Producto.stock_minimo, Producto.stock > 0).order_by(Producto.stock.asc()).all()
     productos_agotados = Producto.query.filter(Producto.stock == 0).all()
 
     # ── Ventas diarias (últimos 7 días) — solo pagados/entregados ──
@@ -175,6 +175,16 @@ def producto_nuevo():
     except (ValueError, TypeError):
         flash('Precio y stock deben ser valores numericos.', 'danger')
         return redirect(url_for('admin_panel.productos'))
+    try:
+        stock_minimo = int(request.form.get('stock_minimo', 10))
+        if stock_minimo <= 0:
+            stock_minimo = 10
+    except (ValueError, TypeError):
+        stock_minimo = 10
+    try:
+        costo = int(request.form.get('costo', 0))
+    except (ValueError, TypeError):
+        costo = 0
     imagen = None
     # Opción 1: subir nueva imagen
     new_image = request.files.get('imagen')
@@ -191,7 +201,8 @@ def producto_nuevo():
                 os.makedirs(dest_dir, exist_ok=True)
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
                 imagen = lib_image
-    prod = Producto(nombre=nombre, precio=precio, stock=stock, imagen=imagen)
+    prod = Producto(nombre=nombre, precio=precio, stock=stock, imagen=imagen,
+                    stock_minimo=stock_minimo, costo=costo)
     db.session.add(prod)
     db.session.commit()
     flash(f'Producto "{nombre}" creado correctamente.', 'success')
@@ -210,6 +221,16 @@ def producto_editar(idproducto):
     except (ValueError, TypeError):
         flash('Precio y stock deben ser valores numericos.', 'danger')
         return redirect(url_for('admin_panel.productos'))
+    try:
+        sm = int(request.form.get('stock_minimo', prod.stock_minimo))
+        if sm > 0:
+            prod.stock_minimo = sm
+    except (ValueError, TypeError):
+        pass
+    try:
+        prod.costo = int(request.form.get('costo', prod.costo))
+    except (ValueError, TypeError):
+        pass
     # Opción 1: subir nueva imagen
     new_image = request.files.get('imagen')
     if new_image and new_image.filename:

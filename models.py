@@ -7,35 +7,39 @@ db = SQLAlchemy()
 
 class Producto(db.Model):
     __tablename__ = 'producto'
-    idproducto = db.Column(db.Integer, primary_key=True)
-    nombre     = db.Column(db.String(100), nullable=False)
-    precio     = db.Column(db.Integer, nullable=False)
-    stock      = db.Column(db.Integer, nullable=False, default=0)
-    imagen     = db.Column(db.String(255), nullable=True, default=None)
+    idproducto   = db.Column(db.Integer, primary_key=True)
+    nombre       = db.Column(db.String(100), nullable=False)
+    precio       = db.Column(db.Integer, nullable=False)
+    stock        = db.Column(db.Integer, nullable=False, default=0)
+    imagen       = db.Column(db.String(255), nullable=True, default=None)
+    stock_minimo = db.Column(db.Integer, nullable=False, default=10)
+    costo        = db.Column(db.Integer, nullable=False, default=0)
 
     detalles_venta  = db.relationship('DetalleVenta',  back_populates='producto')
     detalles_compra = db.relationship('DetalleCompra', back_populates='producto')
 
     @property
     def estado(self):
-        """Retorna el estado del producto según su stock."""
+        """Retorna el estado del producto segun su stock y umbral personalizado."""
         if self.stock == 0:
             return 'Agotado'
-        elif self.stock < 5:
+        umbral_casi = max(self.stock_minimo // 2, 1)
+        if self.stock < umbral_casi:
             return 'Casi agotado'
-        elif self.stock < 10:
+        if self.stock < self.stock_minimo:
             return 'Poco stock'
-        else:
-            return 'En stock'
+        return 'En stock'
 
     def to_dict(self):
         return {
-            'idproducto': self.idproducto,
-            'nombre':     self.nombre,
-            'precio':     self.precio,
-            'stock':      self.stock,
-            'imagen':     self.imagen,
-            'estado':     self.estado,
+            'idproducto':   self.idproducto,
+            'nombre':       self.nombre,
+            'precio':       self.precio,
+            'stock':        self.stock,
+            'imagen':       self.imagen,
+            'estado':       self.estado,
+            'stock_minimo': self.stock_minimo,
+            'costo':        self.costo,
         }
 
 class Cliente(db.Model):

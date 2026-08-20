@@ -7,12 +7,23 @@
 </div>
 <div class="row g-3 mb-3">
   <div class="col">
-    <label class="form-label fw-semibold">Precio ($)</label>
+    <label class="form-label fw-semibold">Precio de venta ($)</label>
     <input type="number" class="form-control" name="precio" min="0" placeholder="8000" required>
   </div>
   <div class="col">
+    <label class="form-label fw-semibold">Costo ($)</label>
+    <input type="number" class="form-control" name="costo" min="0" placeholder="5000">
+  </div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col">
     <label class="form-label fw-semibold">Stock</label>
     <input type="number" class="form-control" name="stock" min="0" placeholder="50" required>
+  </div>
+  <div class="col">
+    <label class="form-label fw-semibold">Alerta stock bajo</label>
+    <input type="number" class="form-control" name="stock_minimo" min="1" placeholder="10">
+    <div class="form-text">A partir de esta cantidad se marca como "Poco stock".</div>
   </div>
 </div>
 
