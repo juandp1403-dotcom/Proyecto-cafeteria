@@ -1,10 +1,12 @@
 from flask import render_template, redirect, url_for, request, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from models import Admin, Personal
+from extensions import limiter
 from . import empleados_bp
 
 
 @empleados_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=['POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('cliente.catalogo'))

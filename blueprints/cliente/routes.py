@@ -2,11 +2,13 @@ from flask import render_template, request, redirect, url_for, session, jsonify,
 from datetime import datetime
 from flask_login import current_user
 from models import db, Producto, Cliente, Venta, DetalleVenta
+from extensions import limiter
 from . import cliente_bp
 
 
 @cliente_bp.route('/', methods=['GET', 'POST'])
 @cliente_bp.route('/registro', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=['POST'])
 def registro():
     if request.method == 'POST':
         doc    = request.form.get('documento', '').strip()

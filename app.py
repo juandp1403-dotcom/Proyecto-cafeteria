@@ -7,6 +7,7 @@ from flask_talisman import Talisman
 from werkzeug.middleware.proxy_fix import ProxyFix
 from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
 from models import db, Admin, Personal
+from extensions import limiter
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 
@@ -49,6 +50,7 @@ def create_app(config_name='default'):
 
     db.init_app(app)
     csrf.init_app(app)
+    limiter.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = 'empleados.login'
     login_manager.login_message = 'Inicia sesión para continuar.'
