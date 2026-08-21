@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, request, flash
+from flask import render_template, redirect, url_for, request, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from models import Admin, Personal
 from . import empleados_bp
@@ -16,11 +16,13 @@ def login():
         admin = Admin.query.filter_by(email=email).first()
         if admin and admin.check_password(clave):
             login_user(admin)
+            session.permanent = True
             return redirect(url_for('cliente.catalogo'))
 
         personal = Personal.query.filter_by(email=email).first()
         if personal and personal.check_password(clave):
             login_user(personal)
+            session.permanent = True
             return redirect(url_for('cliente.catalogo'))
 
         flash('Correo o contraseña incorrectos.', 'danger')

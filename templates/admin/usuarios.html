@@ -31,12 +31,12 @@
           <td>{{ a.email }}</td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre }}', '{{ a.email }}', 'admin', '')">
+                    onclick='abrirEditarUser({{ a.documento }}, {{ a.nombre|tojson }}, {{ a.email|tojson }}, "admin", "")'>
               <i class="bi bi-pencil"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=a.documento) }}"
                   class="d-inline"
-                  onsubmit="return confirm('¿Eliminar al usuario {{ a.nombre }}?')">
+                  onsubmit='return confirm("¿Eliminar al usuario " + {{ a.nombre|tojson }} + "?")'>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <input type="hidden" name="tipo_cuenta" value="admin"/>
               <button type="submit" class="btn btn-outline-danger btn-sm">
@@ -76,12 +76,12 @@
           </td>
           <td>
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditarUser({{ p.docpersonal }}, '{{ p.nombre }}', '{{ p.email }}', 'personal', '{{ p.rol }}')">
+                    onclick='abrirEditarUser({{ p.docpersonal }}, {{ p.nombre|tojson }}, {{ p.email|tojson }}, "personal", {{ p.rol|tojson }})'>
               <i class="bi bi-pencil"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=p.docpersonal) }}"
                   class="d-inline"
-                  onsubmit="return confirm('¿Eliminar al personal {{ p.nombre }}?')">
+                  onsubmit='return confirm("¿Eliminar al personal " + {{ p.nombre|tojson }} + "?")'>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <input type="hidden" name="tipo_cuenta" value="personal"/>
               <button type="submit" class="btn btn-outline-danger btn-sm">

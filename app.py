@@ -38,6 +38,7 @@ def create_app(config_name='default'):
     login_manager.login_view = 'empleados.login'
     login_manager.login_message = 'Inicia sesión para continuar.'
     login_manager.login_message_category = 'warning'
+    login_manager.session_protection = 'strong'
 
     from blueprints.cliente   import cliente_bp
     from blueprints.empleados import empleados_bp
