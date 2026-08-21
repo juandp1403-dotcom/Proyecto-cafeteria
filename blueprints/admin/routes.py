@@ -13,6 +13,20 @@ from . import admin_bp
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_IMAGE_DIMENSION = 4000  # px, HU-13: evita decompression bombs
 
+def _ultimos_12_meses(hoy):
+    """HU-55: los ultimos 12 meses de calendario terminando en `hoy`,
+    con aritmetica real (year*12+month) en vez de aproximar un mes a 30
+    dias -- esa aproximacion acumula deriva y llega a saltarse meses
+    como febrero. Devuelve [(clave 'YYYY-MM', etiqueta 'Mon YYYY'), ...]."""
+    mes_absoluto_actual = hoy.year * 12 + (hoy.month - 1)
+    resultado = []
+    for i in range(12, 0, -1):
+        mes_absoluto = mes_absoluto_actual - (i - 1)
+        anio_mes, mes_mes = divmod(mes_absoluto, 12)
+        fecha_mes = hoy.replace(year=anio_mes, month=mes_mes + 1, day=1)
+        resultado.append((fecha_mes.strftime('%Y-%m'), fecha_mes.strftime('%b %Y')))
+    return resultado
+
 def _allowed_image(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -136,11 +150,9 @@ def dashboard():
         mapa_meses[clave] = int(r.total)
     ventas_mensuales = []
     etiquetas_meses = []
-    for i in range(12, 0, -1):
-        fecha_mes = hoy.replace(day=1) - timedelta(days=(i - 1) * 30)
-        clave = fecha_mes.strftime('%Y-%m')
+    for clave, etiqueta in _ultimos_12_meses(hoy):
         ventas_mensuales.append(mapa_meses.get(clave, 0))
-        etiquetas_meses.append(fecha_mes.strftime('%b %Y'))
+        etiquetas_meses.append(etiqueta)
 
     # ── Top 15 productos más vendidos — solo pagados/entregados ──
     rows_top = (
