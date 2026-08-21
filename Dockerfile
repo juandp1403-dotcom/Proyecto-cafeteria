@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 5545
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5545", "--workers", "2", "wsgi:app"]

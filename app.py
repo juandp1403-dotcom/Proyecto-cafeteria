@@ -22,6 +22,14 @@ def create_app(config_name='default'):
     if puerto:
         app.config['SQLALCHEMY_DATABASE_URI'] = _construir_db_url(puerto)
     elif not app.config.get('SQLALCHEMY_DATABASE_URI'):
+        if config_name == 'production':
+            raise RuntimeError(
+                "No hay conexion real a base de datos configurada (falta SSH_HOST "
+                "para el tunel, o DATABASE_URL). En produccion la app no puede "
+                "arrancar con SQLite efimero: los datos se perderian en cada "
+                "reinicio del contenedor. Configura las variables de entorno "
+                "necesarias antes de desplegar (ver .env.example)."
+            )
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafeteria.db'
 
     db.init_app(app)
@@ -112,6 +120,15 @@ def _migrar_esquema():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # Unificar el rol de entrega: 'entregador' no existe en PERMISOS, el valor
+    # canonico es 'despachador' (ver HU-33)
+    try:
+        db.session.execute(text(
+            "UPDATE admin SET rol = 'despachador' WHERE rol = 'entregador'"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _seed_datos_iniciales():
@@ -148,7 +165,7 @@ def _seed_datos_iniciales():
             nombre=os.environ.get('ENTREGADOR_NOMBRE', 'Entregador Principal'),
             email=os.environ.get('ENTREGADOR_EMAIL', 'entregador@cafeteria.com'),
             clave=generate_password_hash(os.environ.get('ENTREGADOR_PASSWORD', 'Entregador123')),
-            rol='entregador',
+            rol='despachador',
         ))
 
     if not Producto.query.first():

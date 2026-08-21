@@ -33,7 +33,7 @@ def tipo_usuario_actual():
         return None
     rid = current_user.get_id()
     if rid.startswith('admin:'):
-        return 'admin'
+        return getattr(current_user, 'rol', None) or 'admin'
     if rid.startswith('personal:'):
         return getattr(current_user, 'rol', None)
     return None
@@ -43,6 +43,8 @@ def puede(permiso):
     rol = tipo_usuario_actual()
     if rol is None:
         return False
+    if rol == 'admin':
+        return True
     permisos_rol = PERMISOS.get(rol, {})
     return permisos_rol.get(permiso, False)
 
