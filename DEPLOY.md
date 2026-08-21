@@ -55,3 +55,19 @@ volumes:
   imagenes_productos:
   imagenes_activas:
 ```
+
+## CI: lint + tests + pip-audit (HU-30) y Dependabot (HU-23)
+
+- `.github/workflows/ci.yml` corre en cada push/PR a `main`: `ruff`
+  (lint), `pytest` (tests) y `pip-audit` (vulnerabilidades conocidas).
+- `.github/dependabot.yml` abre PRs automáticos semanales para
+  `requirements.txt` y para las Actions usadas en el workflow.
+- **Pendiente de un admin del repo (no se puede hacer por código):**
+  activar "Require status checks to pass before merging" en
+  Settings → Branches → Branch protection rules para `main`, marcando
+  los tres checks (`lint`, `test`, `pip-audit`) como obligatorios.
+- El check `pip-audit` hoy queda en rojo a propósito: hay CVEs
+  conocidos en Flask, Werkzeug, python-dotenv, Pillow y paramiko
+  (ver salida de `pip-audit -r requirements.txt`). Actualizarlos es
+  un cambio aparte que merece su propia verificación (Pillow salta de
+  10.4 a 12.x), no se hizo aquí para no arriesgar el despliegue de hoy.
