@@ -76,7 +76,7 @@
           <div id="items-compra">
             <div class="row g-2 mb-2 item-row">
               <div class="col-7">
-                <select class="form-select" name="idproducto[]" required>
+                <select class="form-select" name="idproducto[]" required id="select-producto-plantilla">
                   <option value="">— Seleccionar producto —</option>
                   {% for p in productos %}
                     <option value="{{ p.idproducto }}">{{ p.nombre }} (stock: {{ p.stock }})</option>
@@ -111,27 +111,33 @@
 
 {% block extra_js %}
 <script>
-const opcionesProductos = `
-  <option value="">— Seleccionar producto —</option>
-  {% for p in productos %}
-    <option value="{{ p.idproducto }}">{{ p.nombre }} (stock: {{ p.stock }})</option>
-  {% endfor %}`;
-
 function agregarFila() {
+  // El <select> de productos se clona del que ya renderizo Jinja con
+  // autoescape, en vez de reconstruir las <option> a partir de un
+  // template literal de JS con el nombre del producto interpolado
+  // (eso permitia inyeccion via backtick/${...} en el nombre).
   const div = document.createElement('div');
   div.className = 'row g-2 mb-2 item-row';
-  div.innerHTML = `
-    <div class="col-7">
-      <select class="form-select" name="idproducto[]" required>${opcionesProductos}</select>
-    </div>
-    <div class="col-4">
-      <input type="number" class="form-control" name="cantidad[]" placeholder="Cantidad" min="1" required>
-    </div>
-    <div class="col-1 d-flex align-items-center">
-      <button type="button" class="btn btn-outline-danger btn-sm" onclick="quitarFila(this)">
-        <i class="bi bi-trash3"></i>
-      </button>
-    </div>`;
+
+  const colSelect = document.createElement('div');
+  colSelect.className = 'col-7';
+  const plantilla = document.getElementById('select-producto-plantilla');
+  const select = plantilla.cloneNode(true);
+  select.removeAttribute('id');
+  select.value = '';
+  colSelect.appendChild(select);
+
+  const colCantidad = document.createElement('div');
+  colCantidad.className = 'col-4';
+  colCantidad.innerHTML = '<input type="number" class="form-control" name="cantidad[]" placeholder="Cantidad" min="1" required>';
+
+  const colBtn = document.createElement('div');
+  colBtn.className = 'col-1 d-flex align-items-center';
+  colBtn.innerHTML = '<button type="button" class="btn btn-outline-danger btn-sm" onclick="quitarFila(this)"><i class="bi bi-trash3"></i></button>';
+
+  div.appendChild(colSelect);
+  div.appendChild(colCantidad);
+  div.appendChild(colBtn);
   document.getElementById('items-compra').appendChild(div);
 }
 

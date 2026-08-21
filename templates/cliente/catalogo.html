@@ -259,9 +259,19 @@ async function confirmarPedido() {
 }
 
 function mostrarAlerta(tipo, msg) {
+  // msg puede incluir un nombre de producto controlado por el admin;
+  // se inserta con textContent (nunca innerHTML) para que no pueda
+  // ejecutar HTML/JS en el navegador del cliente.
   const div = document.createElement('div');
   div.className = `alert alert-${tipo} alert-dismissible fade show fixed-top m-3`;
-  div.innerHTML = `${msg} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  const texto = document.createElement('span');
+  texto.textContent = msg;
+  const btnCerrar = document.createElement('button');
+  btnCerrar.type = 'button';
+  btnCerrar.className = 'btn-close';
+  btnCerrar.setAttribute('data-bs-dismiss', 'alert');
+  div.appendChild(texto);
+  div.appendChild(btnCerrar);
   document.body.prepend(div);
   setTimeout(() => div.remove(), 5000);
 }
