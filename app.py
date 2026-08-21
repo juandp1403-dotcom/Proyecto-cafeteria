@@ -18,7 +18,7 @@ def create_app(config_name='default'):
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'productos')
 
     # ── Tunel SSH → DB ──
-    puerto = _abrir_tunel()
+    puerto = _abrir_tunel(config_name)
     if puerto:
         app.config['SQLALCHEMY_DATABASE_URI'] = _construir_db_url(puerto)
     elif not app.config.get('SQLALCHEMY_DATABASE_URI'):

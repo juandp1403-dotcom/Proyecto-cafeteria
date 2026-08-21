@@ -17,3 +17,18 @@ Antes de dar por bueno un despliegue en producción:
 4. Nunca despliegues con `config_name='development'` en producción: ese
    modo sí permite caer en SQLite efímero (los datos se perderían en
    cada reinicio del contenedor).
+
+## Verificar la clave de host SSH del túnel (HU-43)
+
+Si el despliegue usa `SSH_HOST` para el túnel hacia la base de datos:
+
+1. Obtén la clave de host real del servidor una sola vez, desde una red
+   de confianza: `ssh-keyscan -t ed25519 <tu-host-ssh>`.
+2. Configura `SSH_HOST_KEY` con esa línea (formato `tipo base64key`).
+3. En producción, si `SSH_HOST_KEY` no está configurada, el arranque
+   falla explícitamente con `RuntimeError` — es intencional: sin esa
+   clave, el túnel aceptaría cualquier servidor que se haga pasar por
+   el real (riesgo de intercepción MITM del tráfico hacia la BD).
+4. En desarrollo local, si falta, solo se imprime una advertencia y el
+   túnel sigue funcionando sin verificar — para no bloquear a alguien
+   que recién está configurando su entorno local.
