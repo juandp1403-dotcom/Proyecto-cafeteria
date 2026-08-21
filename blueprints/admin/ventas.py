@@ -125,12 +125,24 @@ def ventas_excel():
     from io import BytesIO
     from sqlalchemy import cast, Date
 
+    # HU-27: rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD).
+    # Sin parametros, mantiene el comportamiento original (solo hoy).
+    MAX_FILAS_EXCEL = 5000
+    desde_str = request.args.get('desde')
+    hasta_str = request.args.get('hasta')
     hoy = datetime.utcnow().date()
+    try:
+        desde = datetime.strptime(desde_str, '%Y-%m-%d').date() if desde_str else hoy
+        hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date() if hasta_str else hoy
+    except ValueError:
+        desde, hasta = hoy, hoy
+
     ventas = (Venta.query
               .options(db.joinedload(Venta.cliente_rel),
                        db.joinedload(Venta.detalles).joinedload(DetalleVenta.producto))
-              .filter(cast(Venta.fechaventa, Date) == hoy)
+              .filter(cast(Venta.fechaventa, Date) >= desde, cast(Venta.fechaventa, Date) <= hasta)
               .order_by(Venta.idventa.asc())
+              .limit(MAX_FILAS_EXCEL)
               .all())
 
     wb = Workbook()

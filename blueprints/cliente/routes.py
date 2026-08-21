@@ -197,6 +197,36 @@ def estado_pedido(idventa):
     return render_template('cliente/estado_pedido.html', venta=venta)
 
 
+@cliente_bp.route('/cancelar/<int:idventa>', methods=['POST'])
+def cancelar_pedido(idventa):
+    """HU-29: el cliente puede cancelar su propio pedido mientras siga
+    en 'Pendiente de Pago', devolviendo el stock igual que cuando lo
+    rechaza un cajero."""
+    venta = Venta.query.get_or_404(idventa)
+    if 'cliente_doc' not in session or session['cliente_doc'] != venta.cliente:
+        flash('No tienes acceso a este pedido.', 'danger')
+        return redirect(url_for('cliente.registro'))
+
+    detalles = list(venta.detalles)
+    # UPDATE condicionado al estado actual (mismo patron que HU-48 en
+    # admin/ventas.py), para que un doble clic no devuelva el stock dos veces.
+    afectados = Venta.query.filter(
+        Venta.idventa == idventa, Venta.estado == 'Pendiente de Pago'
+    ).update({'estado': 'Cancelado'}, synchronize_session=False)
+    db.session.commit()
+
+    if afectados:
+        from models import ajustar_stock
+        for det in detalles:
+            ajustar_stock(det.idproducto, det.cantidad)
+        db.session.commit()
+        flash('Tu pedido fue cancelado.', 'success')
+    else:
+        flash('Este pedido ya no se puede cancelar (ya fue procesado).', 'warning')
+
+    return redirect(url_for('cliente.estado_pedido', idventa=idventa))
+
+
 @cliente_bp.route('/salir')
 def salir():
     session.pop('cliente_doc', None)

@@ -62,9 +62,25 @@ def reportes_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    reportes = (Reporte.query
-                .options(db.joinedload(Reporte.prod_rel))
+    # HU-27: rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD)
+    # y limite maximo de filas -- antes se exportaba todo el historico sin limite.
+    MAX_FILAS_EXCEL = 5000
+    query = Reporte.query.options(db.joinedload(Reporte.prod_rel))
+    desde_str = request.args.get('desde')
+    hasta_str = request.args.get('hasta')
+    try:
+        if desde_str:
+            desde = datetime.strptime(desde_str, '%Y-%m-%d').date()
+            query = query.filter(Reporte.fecha >= desde)
+        if hasta_str:
+            hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date()
+            query = query.filter(Reporte.fecha <= hasta)
+    except ValueError:
+        pass  # rango invalido: se ignora, se exporta sin filtrar por fecha
+
+    reportes = (query
                 .order_by(Reporte.idreporte.desc())
+                .limit(MAX_FILAS_EXCEL)
                 .all())
 
     wb = Workbook()

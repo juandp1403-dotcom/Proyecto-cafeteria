@@ -374,7 +374,9 @@ def productos_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    productos = Producto.query.order_by(Producto.nombre).all()
+    # HU-27: limite maximo de filas (el catalogo no tiene columna de
+    # fecha para filtrar por rango, a diferencia de ventas/reportes).
+    productos = Producto.query.order_by(Producto.nombre).limit(5000).all()
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventario"
