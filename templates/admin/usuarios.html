@@ -25,24 +25,36 @@
       </thead>
       <tbody>
         {% for a in admins %}
-        <tr>
-          <td class="text-muted small">{{ a.documento }}</td>
-          <td class="fw-semibold">{{ a.nombre }}</td>
-          <td>{{ a.email }}</td>
+        <tr {% if not a.activo %}class="table-secondary text-muted"{% endif %}>
+          <td class="text-muted small">{% if puede('ver_datos_personales') %}{{ a.documento }}{% else %}{{ doc_enmascarado(a.documento) }}{% endif %}</td>
+          <td class="fw-semibold">{% if puede('ver_datos_personales') %}{{ a.nombre }}{% else %}{{ iniciales(a.nombre) }}{% endif %} {% if not a.activo %}<span class="badge bg-secondary">Inactivo</span>{% endif %}</td>
+          <td>{% if puede('ver_datos_personales') %}{{ a.email }}{% else %}***@***{% endif %}</td>
           <td>
+            {% if puede('escribir_todo') %}
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre }}', '{{ a.email }}', 'admin', '')">
+                    onclick="abrirEditarUser({{ a.documento }}, '{{ a.nombre|e }}', '{{ a.email }}', 'admin', '')">
               <i class="bi bi-pencil"></i>
             </button>
+            {% if not a.activo %}
+            <form method="POST" action="{{ url_for('admin_panel.usuario_reactivar', documento=a.documento) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="tipo_cuenta" value="admin"/>
+              <button type="submit" class="btn btn-outline-success btn-sm me-1"><i class="bi bi-arrow-counterclockwise"></i> Reactivar</button>
+            </form>
+            {% else %}
             <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=a.documento) }}"
                   class="d-inline"
-                  onsubmit="return confirm('¿Eliminar al usuario {{ a.nombre }}?')">
+                  onsubmit="return confirm('¿Eliminar al usuario {{ a.nombre }}? (Si tiene historial sera desactivado)')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <input type="hidden" name="tipo_cuenta" value="admin"/>
               <button type="submit" class="btn btn-outline-danger btn-sm">
                 <i class="bi bi-trash3"></i>
               </button>
             </form>
+            {% endif %}
+            {% else %}
+            <span class="text-muted small">Solo lectura</span>
+            {% endif %}
           </td>
         </tr>
         {% else %}
@@ -65,29 +77,41 @@
       </thead>
       <tbody>
         {% for p in personal_list %}
-        <tr>
-          <td class="text-muted small">{{ p.docpersonal }}</td>
-          <td class="fw-semibold">{{ p.nombre }}</td>
-          <td>{{ p.email }}</td>
+        <tr {% if not p.activo %}class="table-secondary text-muted"{% endif %}>
+          <td class="text-muted small">{% if puede('ver_datos_personales') %}{{ p.docpersonal }}{% else %}{{ doc_enmascarado(p.docpersonal) }}{% endif %}</td>
+          <td class="fw-semibold">{% if puede('ver_datos_personales') %}{{ p.nombre }}{% else %}{{ iniciales(p.nombre) }}{% endif %} {% if not p.activo %}<span class="badge bg-secondary">Inactivo</span>{% endif %}</td>
+          <td>{% if puede('ver_datos_personales') %}{{ p.email }}{% else %}***@***{% endif %}</td>
           <td>
             <span class="badge {% if p.rol == 'auditor' %}bg-info{% elif p.rol == 'cajero' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
               {{ p.rol|capitalize }}
             </span>
           </td>
           <td>
+            {% if puede('escribir_todo') %}
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditarUser({{ p.docpersonal }}, '{{ p.nombre }}', '{{ p.email }}', 'personal', '{{ p.rol }}')">
+                    onclick="abrirEditarUser({{ p.docpersonal }}, '{{ p.nombre|e }}', '{{ p.email }}', 'personal', '{{ p.rol }}')">
               <i class="bi bi-pencil"></i>
             </button>
+            {% if not p.activo %}
+            <form method="POST" action="{{ url_for('admin_panel.usuario_reactivar', documento=p.docpersonal) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="tipo_cuenta" value="personal"/>
+              <button type="submit" class="btn btn-outline-success btn-sm me-1"><i class="bi bi-arrow-counterclockwise"></i> Reactivar</button>
+            </form>
+            {% else %}
             <form method="POST" action="{{ url_for('admin_panel.usuario_eliminar', documento=p.docpersonal) }}"
                   class="d-inline"
-                  onsubmit="return confirm('¿Eliminar al personal {{ p.nombre }}?')">
+                  onsubmit="return confirm('¿Eliminar al personal {{ p.nombre }}? (Si tiene historial sera desactivado)')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <input type="hidden" name="tipo_cuenta" value="personal"/>
               <button type="submit" class="btn btn-outline-danger btn-sm">
                 <i class="bi bi-trash3"></i>
               </button>
             </form>
+            {% endif %}
+            {% else %}
+            <span class="text-muted small">Solo lectura</span>
+            {% endif %}
           </td>
         </tr>
         {% else %}
@@ -96,6 +120,45 @@
       </tbody>
     </table>
   </div>
+
+  {% if puede('ver_datos_personales') and solicitudes %}
+  <!-- HU-66: Solicitudes de supresion de datos personales (Ley 1581 de 2012) -->
+  <h5 class="fw-bold mt-4 mb-2" style="color:var(--sena-green)">
+    <i class="bi bi-trash3 me-1"></i>Solicitudes de Supresión de Datos
+  </h5>
+  <div class="table-responsive">
+    <table class="table table-hover table-sena align-middle">
+      <thead>
+        <tr><th>#</th><th>Documento</th><th>Nombre</th><th>Motivo</th><th>Fecha</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for s in solicitudes %}
+        <tr>
+          <td class="text-muted small">{{ s.idsolicitud }}</td>
+          <td>{{ s.documento_cliente }}</td>
+          <td>{{ s.nombre_cliente or '–' }}</td>
+          <td class="small">{{ s.motivo or '–' }}</td>
+          <td class="small text-muted">{{ s.fecha.strftime('%d/%m/%Y %H:%M') if s.fecha else '–' }}</td>
+          <td>
+            <span class="badge {% if s.estado == 'Pendiente' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+              {{ s.estado }}
+            </span>
+          </td>
+          <td>
+            {% if s.estado == 'Pendiente' %}
+            <form method="POST" action="{{ url_for('admin_panel.solicitud_supresion_procesar', idsolicitud=s.idsolicitud) }}"
+                  onsubmit="return confirm('¿Marcar como procesada? Recuerda anonimizar/eliminar los datos del cliente.')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn btn-outline-success btn-sm">Marcar procesada</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Modal Nuevo Usuario -->

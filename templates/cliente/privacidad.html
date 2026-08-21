@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Política de Privacidad – Cafetería SENA{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:720px">
+  <div class="card">
+    <div class="card-header-sena">
+      <i class="bi bi-shield-check me-2"></i>Política de Privacidad
+    </div>
+    <div class="card-body p-4">
+
+      <p class="text-muted small">Cafetería CGAO — SENA Centro de Gestión Administrativa y Cooperativista ·
+      Tratamiento de datos personales conforme a la <strong>Ley 1581 de 2012</strong> y el Decreto 1377 de 2013.</p>
+
+      <h5 class="fw-bold mt-4" style="color:var(--sena-green)">1. ¿Qué datos recolectamos?</h5>
+      <ul>
+        <li><strong>Documento de identidad</strong>: para identificar tu pedido de forma única.</li>
+        <li><strong>Nombre completo</strong>: para llamarte al entregar tu pedido.</li>
+        <li><strong>Número de ficha</strong>: para verificar que eres aprendiz o vinculado al centro.</li>
+      </ul>
+      <p>No recolectamos datos sensibles, ni datos financieros, ni información de menores de edad.</p>
+
+      <h5 class="fw-bold mt-4" style="color:var(--sena-green)">2. ¿Para qué los usamos?</h5>
+      <ul>
+        <li>Registrar y entregar los pedidos que haces en la cafetería.</li>
+        <li>Expedir la factura virtual de tus compras.</li>
+        <li>Llevar la contabilidad y reportes oficiales que el SENA exige como entidad pública.</li>
+      </ul>
+      <p>No compartimos tus datos con terceros ajenos al SENA, ni los usamos para publicidad.</p>
+
+      <h5 class="fw-bold mt-4" style="color:var(--sena-green)">3. ¿Cuánto tiempo los conservamos?</h5>
+      <p>Mientras estés vinculado al centro y, después, únicamente el tiempo necesario para cumplir
+      obligaciones contables y tributarias (mínimo <strong>5 años</strong>, conforme al Estatuto Tributario,
+      y hasta <strong>10 años</strong> según el Código de Comercio para registros contables).</p>
+
+      <h5 class="fw-bold mt-4" style="color:var(--sena-green)">4. Tus derechos (Ley 1581 de 2012)</h5>
+      <ul>
+        <li><strong>Conocer, actualizar y rectificar</strong> tus datos en cualquier momento.</li>
+        <li><strong>Solicitar prueba</strong> de la autorización otorgada.</li>
+        <li><strong>Ser informado</strong> sobre el uso que se ha dado a tus datos.</li>
+        <li><strong>Solicitar la supresión</strong> de tus datos cuando no exista deber legal de conservarlos.</li>
+      </ul>
+
+      <h5 class="fw-bold mt-4" style="color:var(--sena-green)">5. ¿Cómo ejercer el derecho de supresión?</h5>
+      <p>Puedes solicitar la eliminación de tus datos personales desde
+      <a href="{{ url_for('cliente.supresion') }}">el formulario de solicitud de supresión</a>.
+      Tu solicitud queda registrada con fecha y será procesada por el administrador.
+      Ten en cuenta que los registros contables de compras ya realizadas deben conservarse por ley,
+      pero quedarán desvinculados de tu identidad.</p>
+
+      {% if session.get('cliente_doc') %}
+      <a href="{{ url_for('cliente.supresion') }}" class="btn btn-outline-danger w-100 mt-2">
+        <i class="bi bi-trash3 me-1"></i>Solicitar supresión de mis datos
+      </a>
+      {% endif %}
+      <a href="{{ url_for('cliente.registro') }}" class="btn btn-sena w-100 mt-2">
+        <i class="bi bi-arrow-left me-1"></i>Volver
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

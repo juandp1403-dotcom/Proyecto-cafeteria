@@ -51,8 +51,14 @@
               <small class="text-muted">Pedido</small>
             </div>
             <div>
+              {% if puede('ver_datos_personales') %}
               <div class="fw-semibold">{{ v.cliente_rel.nombre }}</div>
               <small class="text-muted">Doc: {{ v.cliente }} &middot; Ficha: {{ v.cliente_rel.ficha }}</small>
+              {% else %}
+              {# HU-59: sin permiso ver_datos_personales solo se ven iniciales #}
+              <div class="fw-semibold">{{ iniciales(v.cliente_rel.nombre) if v.cliente_rel else '—' }}</div>
+              <small class="text-muted">Doc: {{ doc_enmascarado(v.cliente) }}</small>
+              {% endif %}
             </div>
           </div>
 
@@ -87,8 +93,8 @@
               <tr>
                 <td>{{ d.producto.nombre if d.producto else 'N/A' }}</td>
                 <td class="text-center">{{ d.cantidad }}</td>
-                <td class="text-end">${{ "{:,}".format(d.producto.precio if d.producto else 0) }}</td>
-                <td class="text-end">${{ "{:,}".format(d.producto.precio * d.cantidad if d.producto else 0) }}</td>
+                <td class="text-end">${{ "{:,}".format(d.precio_historico) }}</td>
+                <td class="text-end">${{ "{:,}".format(d.precio_historico * d.cantidad) }}</td>
               </tr>
               {% endfor %}
             </tbody>

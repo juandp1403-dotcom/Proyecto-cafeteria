@@ -46,7 +46,7 @@
           <tr>
             <td class="text-start">{{ d.producto.nombre }}</td>
             <td class="text-center">{{ d.cantidad }}</td>
-            <td class="text-end">${{ "{:,}".format(d.producto.precio * d.cantidad) }}</td>
+            <td class="text-end">${{ "{:,}".format(d.precio_historico * d.cantidad) }}</td>
           </tr>
           {% endfor %}
         </tbody>

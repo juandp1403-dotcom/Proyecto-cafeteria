@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, session, jsonify, flash
-from datetime import datetime
 from flask_login import current_user
-from models import db, Producto, Cliente, Venta, DetalleVenta
+from models import db, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
+from utils import ahora_bogota
 from . import cliente_bp
 
 
@@ -15,6 +15,13 @@ def registro():
 
         if not doc or not nombre or not ficha:
             return render_template('cliente/registro.html', error='Completa todos los campos.')
+
+        # HU-65: el consentimiento es obligatorio (validacion en backend,
+        # no solo en el HTML) conforme a la Ley 1581 de 2012.
+        if not request.form.get('autorizo_datos'):
+            return render_template(
+                'cliente/registro.html',
+                error='Debes autorizar el tratamiento de tus datos personales conforme a la Ley 1581 de 2012 para continuar.')
 
         try:
             doc   = int(doc)
@@ -53,20 +60,19 @@ def catalogo():
     # de modo que TODOS los productos aparecen siempre (con 0 si no tienen
     # ventas calificadas). Así se evita que un producto con solo ventas
     # 'Pendiente de Pago' o 'Cancelado' desaparezca del catálogo.
-    rows = db.session.query(
-        Producto.idproducto,
-        func.coalesce(
-            func.sum(case((Venta.estado.in_(estados_pagados), DetalleVenta.cantidad), else_=0)),
-            0
-        ).label('total_vendido')
-    ).select_from(Producto) \
-     .outerjoin(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto) \
-     .outerjoin(Venta, Venta.idventa == DetalleVenta.idventa) \
-     .group_by(Producto.idproducto) \
-     .order_by(func.coalesce(
-         func.sum(case((Venta.estado.in_(estados_pagados), DetalleVenta.cantidad), else_=0)),
-         0
-     ).desc()).all()
+    # HU-36: solo productos activos en el catalogo de cliente
+    total_vendido_expr = func.coalesce(
+        func.sum(case((Venta.estado.in_(estados_pagados), DetalleVenta.cantidad), else_=0)),
+        0
+    )
+    rows = (db.session.query(Producto.idproducto, total_vendido_expr.label('total_vendido'))
+            .select_from(Producto)
+            .outerjoin(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto)
+            .outerjoin(Venta, Venta.idventa == DetalleVenta.idventa)
+            .filter(Producto.activo == True)  # noqa: E712
+            .group_by(Producto.idproducto)
+            .order_by(total_vendido_expr.desc())
+            .all())
     
     # Separar: top 10 más vendidos y el resto
     mapa_ventas = {r.idproducto: int(r.total_vendido) for r in rows}
@@ -137,13 +143,14 @@ def confirmar():
     venta = Venta(
         precio     = total,
         cliente    = session['cliente_doc'],
-        fechaventa = datetime.utcnow(),
+        fechaventa = ahora_bogota(),
     )
     db.session.add(venta)
     db.session.flush()
 
     for prod, cant in detalles_a_guardar:
-        detalle = DetalleVenta(idventa=venta.idventa, idproducto=prod.idproducto, cantidad=cant)
+        detalle = DetalleVenta(idventa=venta.idventa, idproducto=prod.idproducto,
+                               cantidad=cant, precio_unitario=prod.precio)
         db.session.add(detalle)
 
     db.session.commit()
@@ -179,3 +186,31 @@ def salir():
     session.pop('cliente_nombre', None)
     session.pop('ultimo_pedido', None)
     return redirect(url_for('cliente.registro'))
+
+
+# ── HU-65/66: privacidad y derecho de supresion (Ley 1581 de 2012) ──
+@cliente_bp.route('/privacidad')
+def privacidad():
+    return render_template('cliente/privacidad.html')
+
+
+@cliente_bp.route('/supresion', methods=['GET', 'POST'])
+def supresion():
+    doc = session.get('cliente_doc')
+    if not doc:
+        flash('Primero identifícate para poder solicitar la supresión de tus datos.', 'warning')
+        return redirect(url_for('cliente.registro'))
+
+    if request.method == 'POST':
+        motivo = request.form.get('motivo', '').strip()
+        solicitud = SolicitudSupresion(
+            documento_cliente=doc,
+            nombre_cliente=session.get('cliente_nombre'),
+            motivo=motivo or None,
+        )
+        db.session.add(solicitud)
+        db.session.commit()
+        flash('Tu solicitud de supresión fue registrada. El administrador la procesará y te contactará si es necesario.', 'success')
+        return redirect(url_for('cliente.catalogo'))
+
+    return render_template('cliente/supresion.html')

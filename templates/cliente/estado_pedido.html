@@ -15,7 +15,7 @@
         {% for d in venta.detalles %}
         <li class="list-group-item d-flex justify-content-between" style="background:transparent">
           <span>{{ d.cantidad }}× {{ d.producto.nombre }}</span>
-          <span class="fw-semibold">${{ "{:,}".format(d.producto.precio * d.cantidad) }}</span>
+          <span class="fw-semibold">${{ "{:,}".format(d.precio_historico * d.cantidad) }}</span>
         </li>
         {% endfor %}
       </ul>

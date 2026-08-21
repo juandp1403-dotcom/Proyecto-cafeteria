@@ -1,11 +1,12 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, current_app
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import timedelta
 import os
 import shutil
 import uuid
-from models import db, Producto, Admin, Personal, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte
-from blueprints.permisos import requiere_permiso, requiere_ver_pagina
+from models import db, expr_fecha, Producto, Admin, Personal, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte, SolicitudSupresion
+from blueprints.permisos import requiere_permiso, requiere_ver_pagina, puede, iniciales, doc_enmascarado
+from utils import ahora_bogota, hoy_bogota
 from . import admin_bp
 
 
@@ -59,31 +60,31 @@ def _get_library_images():
 @login_required
 @requiere_ver_pagina('dashboard')
 def dashboard():
-    from sqlalchemy import func, cast, Date, desc, case
+    from sqlalchemy import func, desc
 
-    hoy = datetime.utcnow().date()
+    hoy = hoy_bogota()
     estados_pagados = ('Pagado/Preparando', 'Preparado', 'Entregado')
 
     # KPIs — solo pedidos pagados / entregados
     total_ventas = int(db.session.query(func.coalesce(func.sum(Venta.precio), 0)).filter(
-        cast(Venta.fechaventa, Date) == hoy,
+        expr_fecha(Venta.fechaventa) == hoy,
         Venta.estado.in_(estados_pagados)
     ).scalar())
     ventas_hoy = int(db.session.query(func.count(Venta.idventa)).filter(
-        cast(Venta.fechaventa, Date) == hoy,
+        expr_fecha(Venta.fechaventa) == hoy,
         Venta.estado.in_(estados_pagados)
     ).scalar())
 
-    productos_bajo = Producto.query.filter(Producto.stock < Producto.stock_minimo, Producto.stock > 0).order_by(Producto.stock.asc()).all()
-    productos_agotados = Producto.query.filter(Producto.stock == 0).all()
+    productos_bajo = Producto.query.filter(Producto.activo == True, Producto.stock < Producto.stock_minimo, Producto.stock > 0).order_by(Producto.stock.asc()).all()  # noqa: E712
+    productos_agotados = Producto.query.filter(Producto.activo == True, Producto.stock == 0).all()  # noqa: E712
 
     # ── Ventas diarias (últimos 7 días) — solo pagados/entregados ──
     desde_dias = hoy - timedelta(days=6)
     rows_diarios = db.session.query(
-        cast(Venta.fechaventa, Date).label('dia'),
+        expr_fecha(Venta.fechaventa).label('dia'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
-        cast(Venta.fechaventa, Date) >= desde_dias,
+        expr_fecha(Venta.fechaventa) >= desde_dias,
         Venta.estado.in_(estados_pagados)
     ).group_by('dia').order_by('dia').all()
     mapa_dias = {str(r.dia): int(r.total) for r in rows_diarios}
@@ -105,7 +106,7 @@ def dashboard():
         mes_col.label('mes'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
-        cast(Venta.fechaventa, Date) >= desde_meses,
+        expr_fecha(Venta.fechaventa) >= desde_meses,
         Venta.estado.in_(estados_pagados)
     ).group_by('mes').order_by('mes').all()
     mapa_meses = {}
@@ -129,7 +130,7 @@ def dashboard():
         .join(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto)
         .join(Venta, Venta.idventa == DetalleVenta.idventa)
         .filter(
-            cast(Venta.fechaventa, Date) >= hoy - timedelta(days=30),
+            expr_fecha(Venta.fechaventa) >= hoy - timedelta(days=30),
             Venta.estado.in_(estados_pagados)
         )
         .group_by(Producto.nombre)
@@ -156,9 +157,22 @@ def dashboard():
 @login_required
 @requiere_ver_pagina('productos')
 def productos():
-    prods = Producto.query.order_by(Producto.idproducto).all()
+    # HU-36: por defecto solo se listan productos activos;
+    # ?inactivos=1 muestra los dados de baja logicamente.
+    ver_inactivos = request.args.get('inactivos') == '1'
+    query = Producto.query.order_by(Producto.idproducto)
+    prods = query.filter(Producto.activo == False).all() if ver_inactivos \
+        else query.filter(Producto.activo == True).all()
     imagenes = _get_library_images()
-    return render_template('admin/productos.html', productos=prods, imagenes_biblioteca=imagenes)
+    # HU-62: ultimas bajas con auditoria (quien y cuando)
+    bajas = (BajaInventario.query
+             .options(db.joinedload(BajaInventario.producto))
+             .order_by(BajaInventario.idbaja.desc())
+             .limit(15)
+             .all())
+    return render_template('admin/productos.html', productos=prods,
+                           imagenes_biblioteca=imagenes, bajas_recientes=bajas,
+                           ver_inactivos=ver_inactivos)
 
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
@@ -256,11 +270,30 @@ def producto_editar(idproducto):
 @requiere_permiso('escribir_todo')
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
-    _delete_image(prod.imagen)
-    db.session.delete(prod)
-    db.session.commit()
-    flash(f'Producto "{prod.nombre}" eliminado.', 'warning')
+    # HU-36: si el producto tiene historial (ventas, compras, bajas o reportes)
+    # NO se borra fisicamente: se marca como inactivo para preservar el historial.
+    tiene_historial = bool(prod.detalles_venta or prod.detalles_compra or prod.bajas or prod.reportes)
+    if tiene_historial:
+        prod.activo = False
+        db.session.commit()
+        flash(f'Producto "{prod.nombre}" tiene historial asociado y fue marcado como INACTIVO (el historial se conserva).', 'warning')
+    else:
+        _delete_image(prod.imagen)
+        db.session.delete(prod)
+        db.session.commit()
+        flash(f'Producto "{prod.nombre}" eliminado.', 'warning')
     return redirect(url_for('admin_panel.productos'))
+
+
+@admin_bp.route('/productos/reactivar/<int:idproducto>', methods=['POST'])
+@login_required
+@requiere_permiso('escribir_todo')
+def producto_reactivar(idproducto):
+    prod = Producto.query.get_or_404(idproducto)
+    prod.activo = True
+    db.session.commit()
+    flash(f'Producto "{prod.nombre}" reactivado.', 'success')
+    return redirect(url_for('admin_panel.productos', inactivos=1))
 
 @admin_bp.route('/productos/baja/<int:idproducto>', methods=['POST'])
 @login_required
@@ -283,7 +316,14 @@ def producto_baja(idproducto):
         return redirect(url_for('admin_panel.productos'))
         
     prod.stock -= cantidad
-    baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo)
+    uid = current_user.get_id()
+    baja = BajaInventario(
+        idproducto        = idproducto,
+        cantidad          = cantidad,
+        motivo            = motivo,
+        usuario_documento = current_user.documento if uid.startswith('admin:') else current_user.docpersonal,
+        usuario_tipo      = 'admin' if uid.startswith('admin:') else 'personal',
+    )
     db.session.add(baja)
     db.session.commit()
     
@@ -309,7 +349,7 @@ def productos_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    productos = Producto.query.order_by(Producto.nombre).all()
+    productos = Producto.query.filter(Producto.activo == True).order_by(Producto.nombre).all()  # noqa: E712
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventario"
@@ -349,7 +389,7 @@ def productos_excel():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fecha = datetime.now().strftime('%Y-%m-%d_%H-%M')
+    fecha = ahora_bogota().strftime('%Y-%m-%d_%H-%M')
     return send_file(buf, as_attachment=True,
                      download_name=f"inventario_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -362,13 +402,12 @@ def ventas_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
-    from sqlalchemy import cast, Date
 
-    hoy = datetime.utcnow().date()
+    hoy = hoy_bogota()
     ventas = (Venta.query
               .options(db.joinedload(Venta.cliente_rel),
                        db.joinedload(Venta.detalles).joinedload(DetalleVenta.producto))
-              .filter(cast(Venta.fechaventa, Date) == hoy)
+              .filter(expr_fecha(Venta.fechaventa) == hoy)
               .order_by(Venta.idventa.asc())
               .all())
 
@@ -396,10 +435,15 @@ def ventas_excel():
         productos_str = ', '.join(
             f"{d.producto.nombre} x{d.cantidad}" for d in v.detalles if d.producto
         )
+        # HU-59: datos personales del cliente solo con el permiso correspondiente
+        ver_datos = puede('ver_datos_personales')
+        nombre_cliente = (v.cliente_rel.nombre if v.cliente_rel else '') if ver_datos else iniciales(v.cliente_rel.nombre if v.cliente_rel else '')
+        doc_cliente = v.cliente if ver_datos else doc_enmascarado(v.cliente)
+        ficha_cliente = (v.cliente_rel.ficha if v.cliente_rel else '') if ver_datos else '*****'
         ws.cell(row=row_idx, column=1, value=row_idx - 1).border = thin_border
-        ws.cell(row=row_idx, column=2, value=v.cliente_rel.nombre if v.cliente_rel else '').border = thin_border
-        ws.cell(row=row_idx, column=3, value=v.cliente).border = thin_border
-        ws.cell(row=row_idx, column=4, value=v.cliente_rel.ficha if v.cliente_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=2, value=nombre_cliente).border = thin_border
+        ws.cell(row=row_idx, column=3, value=doc_cliente).border = thin_border
+        ws.cell(row=row_idx, column=4, value=ficha_cliente).border = thin_border
         ws.cell(row=row_idx, column=5, value=productos_str).border = thin_border
         ws.cell(row=row_idx, column=6, value=v.precio).border = thin_border
         ws.cell(row=row_idx, column=7, value=v.estado).border = thin_border
@@ -417,7 +461,7 @@ def ventas_excel():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fecha = datetime.now().strftime('%Y-%m-%d')
+    fecha = ahora_bogota().strftime('%Y-%m-%d')
     return send_file(buf, as_attachment=True,
                      download_name=f"ventas_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -430,7 +474,26 @@ def ventas_excel():
 def usuarios():
     admins = Admin.query.order_by(Admin.documento).all()
     personal_list = Personal.query.order_by(Personal.docpersonal).all()
-    return render_template('admin/usuarios.html', admins=admins, personal_list=personal_list)
+    # HU-66: solicitudes de supresion pendientes (solo visibles con ver_datos_personales)
+    solicitudes = (SolicitudSupresion.query
+                   .order_by(SolicitudSupresion.fecha.desc())
+                   .limit(30)
+                   .all())
+    return render_template('admin/usuarios.html', admins=admins, personal_list=personal_list,
+                           solicitudes=solicitudes)
+
+
+@admin_bp.route('/usuarios/supresion/procesar/<int:idsolicitud>', methods=['POST'])
+@login_required
+@requiere_permiso('ver_datos_personales')
+def solicitud_supresion_procesar(idsolicitud):
+    """HU-66: marca una solicitud de supresion como procesada.
+    El borrado/anonimizacion de los datos se realiza manualmente."""
+    s = SolicitudSupresion.query.get_or_404(idsolicitud)
+    s.estado = 'Procesada'
+    db.session.commit()
+    flash(f'Solicitud de supresión #{idsolicitud} marcada como procesada.', 'success')
+    return redirect(url_for('admin_panel.usuarios'))
 
 
 @admin_bp.route('/usuarios/nuevo', methods=['POST'])
@@ -504,26 +567,85 @@ def usuario_editar(documento):
     return redirect(url_for('admin_panel.usuarios'))
 
 
+def _admin_tiene_historial(documento):
+    """HU-36: un admin/cajero/auditor tiene historial si registro compras,
+    reportes o bajas de inventario."""
+    return (
+        db.session.query(Compra.idcompra).filter_by(documentoadmin=documento).first() is not None or
+        db.session.query(Reporte.idreporte).filter_by(idadmin=documento).first() is not None or
+        db.session.query(BajaInventario.idbaja)
+            .filter_by(usuario_documento=documento, usuario_tipo='admin').first() is not None
+    )
+
+
+def _personal_tiene_historial(docpersonal):
+    """HU-36: personal tiene historial si registro bajas de inventario."""
+    return db.session.query(BajaInventario.idbaja).filter_by(
+        usuario_documento=docpersonal, usuario_tipo='personal').first() is not None
+
+
 @admin_bp.route('/usuarios/eliminar/<int:documento>', methods=['POST'])
 @login_required
 @requiere_permiso('escribir_todo')
 def usuario_eliminar(documento):
+    from sqlalchemy.exc import IntegrityError
     tipo_cuenta = request.form.get('tipo_cuenta', 'admin')
 
     if tipo_cuenta == 'personal':
         p = Personal.query.get_or_404(documento)
-        db.session.delete(p)
-        db.session.commit()
-        flash('Personal eliminado.', 'warning')
+        # HU-36: chequeo explicito de historial (funciona en cualquier motor de BD)
+        if _personal_tiene_historial(documento):
+            p.activo = False
+            db.session.commit()
+            flash('Este usuario tiene historial asociado y no puede eliminarse; fue desactivado.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        try:
+            db.session.delete(p)
+            db.session.commit()
+            flash('Personal eliminado.', 'warning')
+        except IntegrityError:
+            db.session.rollback()
+            p.activo = False
+            db.session.commit()
+            flash('Este usuario tiene historial asociado y no puede eliminarse; fue desactivado.', 'danger')
     else:
         if documento == current_user.documento:
             flash('No puedes eliminar tu propio usuario.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
         admin = Admin.query.get_or_404(documento)
-        db.session.delete(admin)
-        db.session.commit()
-        flash('Usuario eliminado.', 'warning')
+        # HU-36: chequeo explicito de historial (funciona en cualquier motor de BD)
+        if _admin_tiene_historial(documento):
+            admin.activo = False
+            db.session.commit()
+            flash('Este usuario tiene historial asociado y no puede eliminarse; fue desactivado.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        try:
+            db.session.delete(admin)
+            db.session.commit()
+            flash('Usuario eliminado.', 'warning')
+        except IntegrityError:
+            db.session.rollback()
+            admin.activo = False
+            db.session.commit()
+            flash('Este usuario tiene historial asociado y no puede eliminarse; fue desactivado.', 'danger')
 
+    return redirect(url_for('admin_panel.usuarios'))
+
+
+@admin_bp.route('/usuarios/reactivar/<int:documento>', methods=['POST'])
+@login_required
+@requiere_permiso('escribir_todo')
+def usuario_reactivar(documento):
+    tipo_cuenta = request.form.get('tipo_cuenta', 'admin')
+    if tipo_cuenta == 'personal':
+        p = Personal.query.get_or_404(documento)
+        p.activo = True
+        flash(f'Personal "{p.nombre}" reactivado.', 'success')
+    else:
+        a = Admin.query.get_or_404(documento)
+        a.activo = True
+        flash(f'Usuario "{a.nombre}" reactivado.', 'success')
+    db.session.commit()
     return redirect(url_for('admin_panel.usuarios'))
 
 
@@ -532,11 +654,11 @@ def usuario_eliminar(documento):
 @login_required
 @requiere_ver_pagina('ventas')
 def ventas():
-    from sqlalchemy import func, cast, Date
+    from sqlalchemy import func
 
     page = request.args.get('page', 1, type=int)
     periodo = request.args.get('periodo', 'todos')
-    hoy = datetime.utcnow().date()
+    hoy = hoy_bogota()
 
     query = Venta.query.options(
         db.joinedload(Venta.cliente_rel),
@@ -544,16 +666,16 @@ def ventas():
     )
 
     if periodo == 'dia':
-        query = query.filter(cast(Venta.fechaventa, Date) == hoy)
+        query = query.filter(expr_fecha(Venta.fechaventa) == hoy)
     elif periodo == 'semana':
         desde = hoy - timedelta(days=6)
-        query = query.filter(cast(Venta.fechaventa, Date) >= desde)
+        query = query.filter(expr_fecha(Venta.fechaventa) >= desde)
     elif periodo == 'mes':
         desde = hoy.replace(day=1)
-        query = query.filter(cast(Venta.fechaventa, Date) >= desde)
+        query = query.filter(expr_fecha(Venta.fechaventa) >= desde)
     elif periodo == 'anio':
         desde = hoy.replace(month=1, day=1)
-        query = query.filter(cast(Venta.fechaventa, Date) >= desde)
+        query = query.filter(expr_fecha(Venta.fechaventa) >= desde)
 
     ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15, error_out=False)
 
@@ -640,7 +762,7 @@ def compras():
     compras = (Compra.query
                .order_by(Compra.fechacompra.desc())
                .paginate(page=page, per_page=20, error_out=False))
-    productos = Producto.query.order_by(Producto.nombre).all()
+    productos = Producto.query.filter(Producto.activo == True).order_by(Producto.nombre).all()  # noqa: E712
     return render_template('admin/compras.html', compras=compras, productos=productos)
 
 
@@ -666,13 +788,15 @@ def compra_nueva():
             continue
         prod = Producto.query.get(pid_int)
         if prod and cant_int > 0:
-            total += prod.precio * cant_int
+            # HU-37: la compra se registra al COSTO real del producto,
+            # no al precio de venta.
+            total += prod.costo * cant_int
             detalles.append((prod, cant_int))
 
     compra = Compra(
         nombrevendedor = vendedor,
         precio         = total,
-        fechacompra    = datetime.utcnow(),
+        fechacompra    = hoy_bogota(),
         documentoadmin = current_user.documento
     )
     db.session.add(compra)
@@ -698,7 +822,7 @@ def reportes():
                   .options(db.joinedload(Reporte.prod_rel))
                   .order_by(Reporte.idreporte.desc())
                   .paginate(page=page, per_page=15, error_out=False))
-    productos = Producto.query.order_by(Producto.nombre).all()
+    productos = Producto.query.filter(Producto.activo == True).order_by(Producto.nombre).all()  # noqa: E712
     return render_template('admin/reportes.html', reportes=reportes_q, productos=productos)
 
 
@@ -727,7 +851,7 @@ def reporte_crear():
     reporte = Reporte(
         idadmin     = id_creador,
         descripcion = descripcion or None,
-        fecha       = datetime.utcnow(),
+        fecha       = hoy_bogota(),
         producto    = idproducto
     )
     db.session.add(reporte)
@@ -788,7 +912,7 @@ def reportes_excel():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fecha = datetime.now().strftime('%Y-%m-%d')
+    fecha = ahora_bogota().strftime('%Y-%m-%d')
     return send_file(buf, as_attachment=True,
                      download_name=f"reportes_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

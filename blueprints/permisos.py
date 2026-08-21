@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import abort, flash, redirect, url_for, current_app
+from flask import abort, current_app
 from flask_login import current_user
 
 
@@ -7,21 +7,30 @@ PERMISOS = {
     'admin': {
         'ver_todo': True,
         'escribir_todo': True,
+        # El admin es superusuario: puede ejecutar todas las acciones
+        'aceptar_rechazar_venta': True,
+        'cambiar_estado_entrega': True,
+        'generar_reporte': True,
+        # HU-59: ver documento/nombre/ficha/correo completos de clientes y personal
+        'ver_datos_personales': True,
     },
     'auditor': {
         'ver_todo': True,
         'escribir_todo': False,
+        'ver_datos_personales': False,
     },
     'cajero': {
         'ver_todo': True,
         'escribir_todo': False,
         'aceptar_rechazar_venta': True,
         'generar_reporte': True,
+        'ver_datos_personales': False,
     },
     'despachador': {
         'ver_todo': False,
         'ver_solo': ['ventas'],
         'cambiar_estado_entrega': True,
+        'ver_datos_personales': False,
     },
 }
 
@@ -91,4 +100,21 @@ def registrar_context_processor(app):
             puede=puede,
             puede_ver_pagina=puede_ver_pagina,
             tipo_usuario_actual=tipo_usuario_actual,
+            iniciales=iniciales,
+            doc_enmascarado=doc_enmascarado,
         )
+
+
+# ── HU-59: helpers de enmascaramiento de datos personales ──
+def iniciales(nombre):
+    """Iniciales de un nombre para mostrar cuando no hay permiso de ver datos."""
+    if not nombre:
+        return '—'
+    partes = str(nombre).split()
+    return '.'.join(p[0].upper() for p in partes[:2]) + '.'
+
+
+def doc_enmascarado(doc):
+    """Documento/ficha parcialmente oculto: ***** + ultimos 3 digitos."""
+    s = str(doc) if doc is not None else ''
+    return ('*****' + s[-3:]) if len(s) > 3 else '*****'

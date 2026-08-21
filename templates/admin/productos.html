@@ -8,6 +8,11 @@
       <i class="bi bi-box-seam me-2"></i>Gestion de Productos
     </h4>
     <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_panel.productos', inactivos=0 if ver_inactivos else 1) }}"
+         class="btn btn-outline-secondary">
+        <i class="bi bi-eye{% if ver_inactivos %}-fill{% endif %} me-1"></i>
+        {{ 'Ver activos' if ver_inactivos else 'Ver inactivos' }}
+      </a>
       <a href="{{ url_for('admin_panel.productos_excel') }}" class="btn btn-outline-success">
         <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
       </a>
@@ -71,6 +76,7 @@
           </td>
           <td>
             {% if puede('escribir_todo') %}
+            {% if p.activo %}
             <button class="btn btn-outline-primary btn-sm me-1"
                     onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre|e }}', {{ p.precio }}, {{ p.stock }}, '{{ p.imagen or '' }}', {{ p.costo }}, {{ p.stock_minimo }})" title="Editar">
               <i class="bi bi-pencil"></i>
@@ -81,12 +87,21 @@
             </button>
             <form method="POST" action="{{ url_for('admin_panel.producto_eliminar', idproducto=p.idproducto) }}"
                   class="d-inline"
-                  onsubmit="return confirm('Eliminar este producto?')">
+                  onsubmit="return confirm('Eliminar este producto? (Si tiene historial sera marcado como inactivo)')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <button type="submit" class="btn btn-outline-danger btn-sm">
                 <i class="bi bi-trash3"></i>
               </button>
             </form>
+            {% else %}
+            <span class="badge bg-secondary me-1">Inactivo</span>
+            <form method="POST" action="{{ url_for('admin_panel.producto_reactivar', idproducto=p.idproducto) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn btn-outline-success btn-sm" title="Reactivar">
+                <i class="bi bi-arrow-counterclockwise"></i> Reactivar
+              </button>
+            </form>
+            {% endif %}
             {% endif %}
           </td>
         </tr>
@@ -94,6 +109,33 @@
       </tbody>
     </table>
   </div>
+
+  <!-- HU-62: Bajas de inventario con auditoria (quien y cuando) -->
+  {% if bajas_recientes %}
+  <div class="card mt-3">
+    <div class="card-header-sena">
+      <i class="bi bi-box-arrow-down me-2"></i>Bajas de Inventario (últimas {{ bajas_recientes|length }})
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm table-sena mb-0">
+        <thead><tr><th>Producto</th><th class="text-center">Cant.</th><th>Motivo</th><th>Registrado por</th></tr></thead>
+        <tbody>
+          {% for b in bajas_recientes %}
+          <tr>
+            <td>{{ b.producto.nombre if b.producto else 'N/A' }}</td>
+            <td class="text-center">{{ b.cantidad }}</td>
+            <td>{{ b.motivo }}</td>
+            <td class="small text-muted">
+              Registrado por: <strong>{{ b.usuario_nombre or 'Desconocido' }}</strong>
+              el {{ b.fecha.strftime('%d/%m/%Y') if b.fecha else '–' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 {% if puede('escribir_todo') %}
