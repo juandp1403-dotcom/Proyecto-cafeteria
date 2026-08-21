@@ -13,12 +13,12 @@ def login():
         email = request.form.get('email', '').strip()
         clave = request.form.get('clave', '').strip()
 
-        admin = Admin.query.filter_by(email=email).first()
+        admin = Admin.query.filter_by(email=email, activo=True).first()
         if admin and admin.check_password(clave):
             login_user(admin)
             return redirect(url_for('cliente.catalogo'))
 
-        personal = Personal.query.filter_by(email=email).first()
+        personal = Personal.query.filter_by(email=email, activo=True).first()
         if personal and personal.check_password(clave):
             login_user(personal)
             return redirect(url_for('cliente.catalogo'))

@@ -48,7 +48,7 @@
         <div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
       {% endif %}
 
-      <form method="POST" action="{{ url_for('cliente.registro') }}" novalidate>
+      <form method="POST" action="{{ url_for('cliente.registro') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
           <label class="form-label fw-semibold">
@@ -66,12 +66,22 @@
                  placeholder="Tu nombre" required>
         </div>
 
-        <div class="mb-4">
+        <div class="mb-3">
           <label class="form-label fw-semibold">
             <i class="bi bi-mortarboard me-1" style="color:var(--sena-green)"></i>Número de Ficha
           </label>
           <input type="number" class="form-control form-control-lg" name="ficha"
                  placeholder="Ej: 2895461" required>
+        </div>
+
+        {# HU-65: consentimiento obligatorio, NO marcado por defecto (Ley 1581 de 2012) #}
+        <div class="form-check mb-4 text-start small">
+          <input class="form-check-input" type="checkbox" name="autorizo_datos" id="autorizoDatos" required>
+          <label class="form-check-label" for="autorizoDatos">
+            Autorizo el tratamiento de mis datos personales conforme a la
+            <a href="{{ url_for('cliente.privacidad') }}" target="_blank">Ley 1581 de 2012</a>
+            y su <a href="{{ url_for('cliente.privacidad') }}" target="_blank">política de privacidad</a>.
+          </label>
         </div>
 
         <button type="submit" class="btn btn-sena w-100 btn-lg">

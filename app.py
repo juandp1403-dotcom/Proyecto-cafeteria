@@ -2,10 +2,8 @@ import os
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
-from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
+from config import config, _abrir_tunel, _construir_db_url
 from models import db, Admin, Personal
-from apscheduler.schedulers.background import BackgroundScheduler
-import atexit
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
@@ -51,8 +49,6 @@ def create_app(config_name='default'):
         _migrar_esquema()
         _seed_datos_iniciales()
 
-    _iniciar_scheduler(app)
-
     return app
 
 
@@ -61,57 +57,129 @@ def load_user(user_id):
     if ':' in user_id:
         tipo, doc = user_id.split(':', 1)
         if tipo == 'admin':
-            return Admin.query.get(int(doc))
+            user = Admin.query.get(int(doc))
         elif tipo == 'personal':
-            return Personal.query.get(int(doc))
+            user = Personal.query.get(int(doc))
+        else:
+            return None
+        # HU-36: usuarios desactivados no pueden iniciar sesion
+        if user is not None and not getattr(user, 'activo', True):
+            return None
+        return user
     return None
 
 
 def _migrar_esquema():
     """Ajusta el esquema de la BD segun el motor (solo PostgreSQL)."""
     uri = db.engine.url
-    if uri.drivername not in ('postgresql', 'postgresql+psycopg', 'postgresql+psycopg2'):
-        return
-    from sqlalchemy import text
+    es_pg = uri.drivername in ('postgresql', 'postgresql+psycopg', 'postgresql+psycopg2')
+    from sqlalchemy import text, inspect
+    insp = inspect(db.engine)
+
+    def columna_existe(tabla, columna):
+        try:
+            return columna in [c['name'] for c in insp.get_columns(tabla)]
+        except Exception:
+            return False
+
+    def agregar_columna(tabla, columna, ddl_pg, ddl_sqlite):
+        """Agrega una columna de forma segura en ambos motores."""
+        if es_pg:
+            try:
+                db.session.execute(text(ddl_pg))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        else:
+            if not columna_existe(tabla, columna):
+                try:
+                    db.session.execute(text(ddl_sqlite))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+    if es_pg:
+        try:
+            db.session.execute(text(
+                "ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        # HU-56: venta.fechaventa pasa de DATE a TIMESTAMP para conservar la hora real
+        try:
+            db.session.execute(text(
+                "ALTER TABLE venta ALTER COLUMN fechaventa TYPE TIMESTAMP USING fechaventa::timestamp"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    # ── Columnas agregadas en cambios anteriores (ambos motores) ──
+    agregar_columna('producto', 'imagen',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)",
+                    "ALTER TABLE producto ADD COLUMN imagen VARCHAR(255)")
+    agregar_columna('venta', 'estado',
+                    "ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado VARCHAR(30) DEFAULT 'Pendiente de Pago'",
+                    "ALTER TABLE venta ADD COLUMN estado VARCHAR(30) DEFAULT 'Pendiente de Pago'")
+    agregar_columna('admin', 'rol',
+                    "ALTER TABLE admin ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'admin'",
+                    "ALTER TABLE admin ADD COLUMN rol VARCHAR(20) DEFAULT 'admin'")
+    agregar_columna('producto', 'stock_minimo',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INT NOT NULL DEFAULT 10",
+                    "ALTER TABLE producto ADD COLUMN stock_minimo INT NOT NULL DEFAULT 10")
+    agregar_columna('producto', 'costo',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS costo INT NOT NULL DEFAULT 0",
+                    "ALTER TABLE producto ADD COLUMN costo INT NOT NULL DEFAULT 0")
+
+    # ── HU-35: precio historico por detalle de venta ──
+    agregar_columna(
+        'detalleventa', 'precio_unitario',
+        "ALTER TABLE detalleventa ADD COLUMN IF NOT EXISTS precio_unitario INT NOT NULL DEFAULT 0",
+        "ALTER TABLE detalleventa ADD COLUMN precio_unitario INT NOT NULL DEFAULT 0",
+    )
+    # Backfill: filas legacy se rellenan con el precio ACTUAL del producto
+    # (mejor aproximacion posible; las ventas nuevas ya guardan su precio real).
     try:
         db.session.execute(text(
-            "ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)"
+            "UPDATE detalleventa SET precio_unitario = "
+            "COALESCE((SELECT p.precio FROM producto p WHERE p.idproducto = detalleventa.idproducto), 0) "
+            "WHERE precio_unitario IS NULL OR precio_unitario = 0"
         ))
         db.session.commit()
     except Exception:
         db.session.rollback()
-    # Agregar columna imagen si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna estado a venta si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado VARCHAR(30) DEFAULT 'Pendiente de Pago'"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna rol a admin si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE admin ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'admin'"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna stock_minimo a producto si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INT NOT NULL DEFAULT 10"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+
+    # ── HU-62: auditoria (quien y cuando) ──
+    agregar_columna('producto', 'created_at',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS created_at TIMESTAMP",
+                    "ALTER TABLE producto ADD COLUMN created_at TIMESTAMP")
+    agregar_columna('producto', 'updated_at',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP",
+                    "ALTER TABLE producto ADD COLUMN updated_at TIMESTAMP")
+    agregar_columna('venta', 'created_at',
+                    "ALTER TABLE venta ADD COLUMN IF NOT EXISTS created_at TIMESTAMP",
+                    "ALTER TABLE venta ADD COLUMN created_at TIMESTAMP")
+    agregar_columna('venta', 'updated_at',
+                    "ALTER TABLE venta ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP",
+                    "ALTER TABLE venta ADD COLUMN updated_at TIMESTAMP")
+    agregar_columna('bajainventario', 'usuario_documento',
+                    "ALTER TABLE bajainventario ADD COLUMN IF NOT EXISTS usuario_documento INT",
+                    "ALTER TABLE bajainventario ADD COLUMN usuario_documento INT")
+    agregar_columna('bajainventario', 'usuario_tipo',
+                    "ALTER TABLE bajainventario ADD COLUMN IF NOT EXISTS usuario_tipo VARCHAR(20)",
+                    "ALTER TABLE bajainventario ADD COLUMN usuario_tipo VARCHAR(20)")
+
+    # ── HU-36: borrado logico ──
+    agregar_columna('producto', 'activo',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE",
+                    "ALTER TABLE producto ADD COLUMN activo BOOLEAN NOT NULL DEFAULT 1")
+    agregar_columna('admin', 'activo',
+                    "ALTER TABLE admin ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE",
+                    "ALTER TABLE admin ADD COLUMN activo BOOLEAN NOT NULL DEFAULT 1")
+    agregar_columna('personal', 'activo',
+                    "ALTER TABLE personal ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE",
+                    "ALTER TABLE personal ADD COLUMN activo BOOLEAN NOT NULL DEFAULT 1")
 
 
 def _seed_datos_iniciales():
@@ -165,11 +233,6 @@ def _seed_datos_iniciales():
         db.session.add_all(productos)
 
     db.session.commit()
-
-
-def _iniciar_scheduler(app):
-    # TODO: implementar reset diario de contadores si se necesita
-    pass
 
 
 if __name__ == '__main__':
