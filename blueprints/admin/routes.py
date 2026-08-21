@@ -5,7 +5,7 @@ from PIL import Image
 import os
 import shutil
 import uuid
-from models import db, Producto, Admin, Personal, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte
+from models import db, Producto, Admin, Personal, Venta, DetalleVenta, Compra, DetalleCompra, BajaInventario, Reporte, ajustar_stock
 from blueprints.permisos import requiere_permiso, requiere_ver_pagina
 from . import admin_bp
 
@@ -219,6 +219,11 @@ def producto_nuevo():
         costo = int(request.form.get('costo', 0))
     except (ValueError, TypeError):
         costo = 0
+    # HU-38: el min="0" del formulario es solo del lado del cliente,
+    # un request directo podia guardar precio/costo/stock negativos.
+    if precio < 0 or costo < 0 or stock < 0:
+        flash('Precio, costo y stock no pueden ser negativos.', 'danger')
+        return redirect(url_for('admin_panel.productos'))
     imagen = None
     # Opción 1: subir nueva imagen
     new_image = request.files.get('imagen')
@@ -250,19 +255,26 @@ def producto_editar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     prod.nombre = request.form.get('nombre', prod.nombre).strip()
     try:
-        prod.precio = int(request.form.get('precio', prod.precio))
-        prod.stock  = int(request.form.get('stock', prod.stock))
+        nuevo_precio = int(request.form.get('precio', prod.precio))
+        nuevo_stock  = int(request.form.get('stock', prod.stock))
     except (ValueError, TypeError):
         flash('Precio y stock deben ser valores numericos.', 'danger')
         return redirect(url_for('admin_panel.productos'))
     try:
+        nuevo_costo = int(request.form.get('costo', prod.costo))
+    except (ValueError, TypeError):
+        nuevo_costo = prod.costo
+    # HU-38: rechazar negativos aunque el formulario HTML los permita
+    if nuevo_precio < 0 or nuevo_stock < 0 or nuevo_costo < 0:
+        flash('Precio, costo y stock no pueden ser negativos.', 'danger')
+        return redirect(url_for('admin_panel.productos'))
+    prod.precio = nuevo_precio
+    prod.stock  = nuevo_stock
+    prod.costo  = nuevo_costo
+    try:
         sm = int(request.form.get('stock_minimo', prod.stock_minimo))
         if sm > 0:
             prod.stock_minimo = sm
-    except (ValueError, TypeError):
-        pass
-    try:
-        prod.costo = int(request.form.get('costo', prod.costo))
     except (ValueError, TypeError):
         pass
     # Opción 1: subir nueva imagen
@@ -311,12 +323,13 @@ def producto_baja(idproducto):
     if cantidad <= 0 or not motivo:
         flash('La cantidad y el motivo son obligatorios.', 'danger')
         return redirect(url_for('admin_panel.productos'))
-        
-    if cantidad > prod.stock:
+
+    # HU-47: UPDATE condicional atomico, evita que dos bajas concurrentes
+    # dejen el stock negativo (el chequeo previo por separado era TOCTOU).
+    if not ajustar_stock(idproducto, -cantidad):
         flash(f'No puedes dar de baja más unidades de las que hay en stock ({prod.stock}).', 'danger')
         return redirect(url_for('admin_panel.productos'))
-        
-    prod.stock -= cantidad
+
     baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo)
     db.session.add(baja)
     db.session.commit()
@@ -760,14 +773,26 @@ def ventas():
     return render_template('admin/ventas.html', ventas=ventas, periodo=periodo)
 
 
+def _transicion_venta(idventa, estados_validos, estado_nuevo):
+    """HU-48: UPDATE condicionado al estado ACTUAL en la base de datos,
+    no al que se leyo minutos antes -- asi un doble clic (dos requests
+    casi simultaneos) solo aplica el efecto una vez, la segunda
+    peticion ya no encuentra el estado esperado y no hace nada."""
+    if isinstance(estados_validos, str):
+        estados_validos = (estados_validos,)
+    afectados = Venta.query.filter(
+        Venta.idventa == idventa, Venta.estado.in_(estados_validos)
+    ).update({'estado': estado_nuevo}, synchronize_session=False)
+    db.session.commit()
+    return afectados > 0
+
+
 @admin_bp.route('/ventas/aceptar/<int:idventa>', methods=['POST'])
 @login_required
 @requiere_permiso('aceptar_rechazar_venta')
 def venta_aceptar(idventa):
-    venta = Venta.query.get_or_404(idventa)
-    if venta.estado == 'Pendiente de Pago':
-        venta.estado = 'Pagado/Preparando'
-        db.session.commit()
+    Venta.query.get_or_404(idventa)
+    if _transicion_venta(idventa, 'Pendiente de Pago', 'Pagado/Preparando'):
         flash(f'Pedido #{idventa} aceptado y en preparación.', 'success')
     else:
         flash('Solo se pueden aceptar pedidos pendientes.', 'warning')
@@ -779,13 +804,11 @@ def venta_aceptar(idventa):
 @requiere_permiso('aceptar_rechazar_venta')
 def venta_rechazar(idventa):
     venta = Venta.query.get_or_404(idventa)
-    if venta.estado == 'Pendiente de Pago':
-        # Restore stock
-        for det in venta.detalles:
-            prod = Producto.query.get(det.idproducto)
-            if prod:
-                prod.stock += det.cantidad
-        venta.estado = 'Cancelado'
+    detalles = list(venta.detalles)  # leer antes de la transicion
+    if _transicion_venta(idventa, 'Pendiente de Pago', 'Cancelado'):
+        # HU-47: UPDATE atomico por producto, no lectura+escritura
+        for det in detalles:
+            ajustar_stock(det.idproducto, det.cantidad)
         db.session.commit()
         flash(f'Pedido #{idventa} rechazado. Stock devuelto.', 'danger')
     else:
@@ -798,10 +821,8 @@ def venta_rechazar(idventa):
 @login_required
 @requiere_permiso('cambiar_estado_entrega')
 def venta_preparado(idventa):
-    venta = Venta.query.get_or_404(idventa)
-    if venta.estado == 'Pagado/Preparando':
-        venta.estado = 'Preparado'
-        db.session.commit()
+    Venta.query.get_or_404(idventa)
+    if _transicion_venta(idventa, 'Pagado/Preparando', 'Preparado'):
         flash(f'Pedido #{idventa} marcado como preparado.', 'success')
     else:
         flash('Solo se pueden preparar pedidos en estado Pagado/Preparando.', 'warning')
@@ -812,10 +833,8 @@ def venta_preparado(idventa):
 @login_required
 @requiere_permiso('cambiar_estado_entrega')
 def venta_entregado(idventa):
-    venta = Venta.query.get_or_404(idventa)
-    if venta.estado in ('Pagado/Preparando', 'Preparado'):
-        venta.estado = 'Entregado'
-        db.session.commit()
+    Venta.query.get_or_404(idventa)
+    if _transicion_venta(idventa, ('Pagado/Preparando', 'Preparado'), 'Entregado'):
         flash(f'Pedido #{idventa} marcado como entregado.', 'success')
     else:
         flash('No se puede entregar este pedido.', 'warning')
@@ -872,7 +891,7 @@ def compra_nueva():
     for prod, cant in detalles:
         dc = DetalleCompra(idcompra=compra.idcompra, idproducto=prod.idproducto, cantidad=cant)
         db.session.add(dc)
-        prod.stock += cant  # suma al inventario
+        ajustar_stock(prod.idproducto, cant)  # HU-47: UPDATE atomico
 
     db.session.commit()
     flash('Compra registrada y stock actualizado.', 'success')

@@ -116,17 +116,29 @@ def confirmar():
     if not items:
         return jsonify({'error': 'Carrito vacio'}), 400
 
-    total = 0
-    detalles_a_guardar = []
+    # HU-49: limitar cuantos items distintos puede traer un pedido, y
+    # consolidar cantidades repetidas del mismo producto ANTES de
+    # validar el tope de 100 -- antes se podia evadir ese tope
+    # repitiendo el mismo producto en varias filas del carrito.
+    if len(items) > 50:
+        return jsonify({'error': 'El pedido tiene demasiados items distintos (maximo 50)'}), 400
 
+    cantidades_por_producto = {}
     for item in items:
         try:
             idproducto = int(item['idproducto'])
             cantidad = int(item['cantidad'])
         except (ValueError, TypeError, KeyError):
             return jsonify({'error': 'Datos de producto invalidos'}), 400
+        if cantidad <= 0:
+            return jsonify({'error': f'Cantidad invalida para el producto {idproducto}'}), 400
+        cantidades_por_producto[idproducto] = cantidades_por_producto.get(idproducto, 0) + cantidad
 
-        if cantidad <= 0 or cantidad > 100:
+    total = 0
+    detalles_a_guardar = []
+
+    for idproducto, cantidad in cantidades_por_producto.items():
+        if cantidad > 100:
             return jsonify({'error': f'Cantidad invalida para el producto {idproducto} (debe ser entre 1 y 100)'}), 400
 
         prod = Producto.query.get(idproducto)

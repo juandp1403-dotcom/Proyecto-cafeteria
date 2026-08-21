@@ -42,6 +42,19 @@ class Producto(db.Model):
             'costo':        self.costo,
         }
 
+
+def ajustar_stock(idproducto, delta):
+    """Ajusta el stock de un producto con un UPDATE condicional atomico,
+    para que dos operaciones concurrentes (venta, baja, rechazo, compra)
+    no se pisen entre si. Si delta es negativo, exige que el stock
+    resultante no quede negativo. Devuelve True si se aplico el ajuste,
+    False si no habia stock suficiente (delta negativo)."""
+    query = Producto.query.filter(Producto.idproducto == idproducto)
+    if delta < 0:
+        query = query.filter(Producto.stock >= -delta)
+    afectados = query.update({'stock': Producto.stock + delta})
+    return afectados > 0
+
 class Cliente(db.Model):
     __tablename__ = 'cliente'
     documento = db.Column(db.Integer, primary_key=True)
