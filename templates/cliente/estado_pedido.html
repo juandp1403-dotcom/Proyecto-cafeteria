@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Pedido #{{ venta.idventa }}{% endblock %}
+{% block title %}Pedido #{{ venta.numero_pedido_diario or venta.idventa }}{% endblock %}
 
 {% block content %}
 <div class="container py-4" style="max-width:480px">
   <div class="card">
     <div class="card-header-sena text-center">
-      <i class="bi bi-receipt me-2"></i>Pedido #{{ venta.idventa }}
+      <i class="bi bi-receipt me-2"></i>Pedido #{{ venta.numero_pedido_diario or venta.idventa }}
     </div>
     <div class="card-body p-4 text-center">
       <p class="text-muted">{{ venta.cliente_rel.nombre }}</p>

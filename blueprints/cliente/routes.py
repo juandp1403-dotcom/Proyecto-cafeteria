@@ -1,6 +1,7 @@
 from flask import render_template, request, redirect, url_for, session, jsonify, flash, current_app
 from datetime import datetime
 from flask_login import current_user
+from sqlalchemy import func
 from models import db, Producto, Cliente, Venta, DetalleVenta
 from extensions import limiter
 from . import cliente_bp
@@ -166,11 +167,22 @@ def confirmar():
     if metodo_pago not in metodos_validos:
         metodo_pago = 'Efectivo'
 
+    # HU-57: numero de pedido consecutivo del dia, calculado y guardado
+    # una sola vez al crear la venta (no como propiedad recalculada en
+    # cada lectura). No es perfectamente a prueba de condiciones de
+    # carrera bajo concurrencia muy alta, pero es la misma fuente para
+    # cliente y cajero -- ya no hay tres numeraciones que no coinciden.
+    hoy = datetime.utcnow().date()
+    ultimo_numero = (db.session.query(func.coalesce(func.max(Venta.numero_pedido_diario), 0))
+                      .filter(Venta.fechaventa == hoy)
+                      .scalar())
+
     venta = Venta(
         precio      = total,
         cliente     = session['cliente_doc'],
         fechaventa  = datetime.utcnow(),
         metodo_pago = metodo_pago,
+        numero_pedido_diario = ultimo_numero + 1,
     )
     db.session.add(venta)
     db.session.flush()

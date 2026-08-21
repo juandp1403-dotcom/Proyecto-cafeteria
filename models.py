@@ -79,22 +79,16 @@ class Venta(db.Model):
     # (HU-75, pendiente) y para que los reportes reflejen la realidad
     # de como entra el dinero, no solo el total.
     metodo_pago = db.Column(db.String(20), nullable=True)
+    # HU-57: numero de pedido consecutivo DENTRO DEL DIA, persistido al
+    # crear la venta (antes existian tres numeraciones distintas que no
+    # coincidian entre si: el id global en la factura del cliente, un
+    # indice de paginacion en la lista del cajero, y esta misma logica
+    # pero calculada de nuevo en cada lectura via COUNT -- ahora es una
+    # sola fuente, escrita una vez).
+    numero_pedido_diario = db.Column(db.Integer, nullable=True)
 
     cliente_rel = db.relationship('Cliente',      back_populates='ventas')
     detalles    = db.relationship('DetalleVenta', back_populates='venta', cascade='all, delete-orphan')
-
-    @property
-    def numero_pedido_diario(self):
-        """Número secuencial de pedido dentro del mismo día."""
-        from sqlalchemy import func
-        fecha = self.fechaventa or datetime.utcnow().date()
-        if self.idventa:
-            num = (db.session.query(func.count(Venta.idventa))
-                   .filter(Venta.fechaventa == fecha, Venta.idventa <= self.idventa)
-                   .scalar())
-        else:
-            num = 0
-        return num
 
     # HU-22: to_dict() nunca se usa en ningun lado del codigo (verificado
     # por grep) y dependia de numero_pedido_diario, que hace una consulta

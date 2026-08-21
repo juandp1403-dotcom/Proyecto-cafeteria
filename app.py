@@ -205,6 +205,17 @@ def _migrar_esquema():
     _ejecutar_migracion("ALTER TABLE producto ADD COLUMN IF NOT EXISTS especial_hasta DATE")
     # HU-76: metodo de pago de la venta
     _ejecutar_migracion("ALTER TABLE venta ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(20)")
+    # HU-57: numero de pedido consecutivo diario persistido, reemplaza
+    # las tres numeraciones distintas que no coincidian entre si.
+    _ejecutar_migracion("ALTER TABLE venta ADD COLUMN IF NOT EXISTS numero_pedido_diario INTEGER")
+    _ejecutar_migracion("""
+        UPDATE venta SET numero_pedido_diario = sub.n
+        FROM (
+            SELECT idventa, ROW_NUMBER() OVER (PARTITION BY fechaventa ORDER BY idventa) AS n
+            FROM venta
+        ) AS sub
+        WHERE venta.idventa = sub.idventa AND venta.numero_pedido_diario IS NULL
+    """)
 
 
 def _clave_seed(env_var, default_dev, config_name):

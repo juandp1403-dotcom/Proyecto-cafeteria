@@ -36,15 +36,6 @@ def ventas():
 
     ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15, error_out=False)
 
-    # Recompute sequential number: within each day, order by id asc
-    nums_dia = {}
-    for v in ventas.items:
-        key = str(v.fechaventa)
-        if key not in nums_dia:
-            nums_dia[key] = 0
-        nums_dia[key] += 1
-        v._num_sequential = nums_dia[key]
-
     return render_template('admin/ventas.html', ventas=ventas, periodo=periodo)
 
 
