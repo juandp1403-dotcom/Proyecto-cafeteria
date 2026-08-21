@@ -1,6 +1,7 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
+from PIL import Image
 import os
 import shutil
 import uuid
@@ -10,9 +11,28 @@ from . import admin_bp
 
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MAX_IMAGE_DIMENSION = 4000  # px, HU-13: evita decompression bombs
 
 def _allowed_image(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def _es_imagen_valida(file_storage):
+    """HU-12/HU-13: verifica que el archivo sea realmente una imagen
+    valida (no solo que tenga extension de imagen) y que sus dimensiones
+    no sean excesivas."""
+    try:
+        file_storage.stream.seek(0)
+        Image.open(file_storage.stream).verify()
+    except Exception:
+        return False
+    try:
+        file_storage.stream.seek(0)
+        ancho, alto = Image.open(file_storage.stream).size
+    except Exception:
+        return False
+    finally:
+        file_storage.stream.seek(0)
+    return ancho <= MAX_IMAGE_DIMENSION and alto <= MAX_IMAGE_DIMENSION
 
 def _library_dir():
     return os.path.join(current_app.static_folder, 'imagenes')
@@ -22,6 +42,8 @@ def _save_image(file_storage):
     if not file_storage or not file_storage.filename:
         return None
     if not _allowed_image(file_storage.filename):
+        return None
+    if not _es_imagen_valida(file_storage):
         return None
     ext = file_storage.filename.rsplit('.', 1)[1].lower()
     filename = f"{uuid.uuid4().hex[:12]}.{ext}"
