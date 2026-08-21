@@ -192,6 +192,70 @@ def _migrar_esquema():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # Agregar columna costo a producto si no existe (el codigo ya la usa
+    # para calcular margen de venta)
+    try:
+        db.session.execute(text(
+            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS costo INT NOT NULL DEFAULT 0"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Ampliar longitud de nombre de producto/cliente (el codigo permite
+    # hasta 100 caracteres; algunas bases quedaron con columnas mas
+    # cortas). Ampliar un VARCHAR nunca trunca datos existentes.
+    try:
+        db.session.execute(text(
+            "ALTER TABLE producto ALTER COLUMN nombre TYPE VARCHAR(100)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        db.session.execute(text(
+            "ALTER TABLE cliente ALTER COLUMN nombre TYPE VARCHAR(100)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Ampliar admin.email a 120 caracteres y asegurar que sea unico
+    # (el login busca por email; sin unicidad, dos cuentas podrian
+    # compartir correo).
+    try:
+        db.session.execute(text(
+            "ALTER TABLE admin ALTER COLUMN email TYPE VARCHAR(120)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        db.session.execute(text(
+            "ALTER TABLE admin ADD CONSTRAINT admin_email_key UNIQUE (email)"
+        ))
+        db.session.commit()
+    except Exception:
+        # Falla si ya existe la restriccion, o si hay correos duplicados
+        # sin resolver -- en ese caso el equipo debe depurarlos a mano
+        # antes de que esta restriccion pueda aplicarse.
+        db.session.rollback()
+    # Corrige un bug de esquema encontrado en la base real: 'reporte'
+    # tenia UNIQUE en idadmin y en producto, lo que impedia que un mismo
+    # admin creara mas de un reporte, o que un mismo producto apareciera
+    # en mas de un reporte, en toda la historia del sistema.
+    try:
+        db.session.execute(text(
+            "ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_idadmin_key"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    try:
+        db.session.execute(text(
+            "ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_producto_key"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _seed_datos_iniciales():
