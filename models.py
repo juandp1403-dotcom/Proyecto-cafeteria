@@ -14,6 +14,11 @@ class Producto(db.Model):
     imagen       = db.Column(db.String(255), nullable=True, default=None)
     stock_minimo = db.Column(db.Integer, nullable=False, default=10)
     costo        = db.Column(db.Integer, nullable=False, default=0)
+    # HU-68: destacar un producto como especial/promocion del dia en el
+    # catalogo. especial_hasta es opcional -- si se pone, la promocion
+    # se considera vencida despues de esa fecha (logica en el codigo).
+    es_especial     = db.Column(db.Boolean, nullable=False, default=False)
+    especial_hasta  = db.Column(db.Date, nullable=True)
 
     detalles_venta  = db.relationship('DetalleVenta',  back_populates='producto')
     detalles_compra = db.relationship('DetalleCompra', back_populates='producto')
@@ -70,6 +75,10 @@ class Venta(db.Model):
     cliente    = db.Column(db.Integer, db.ForeignKey('cliente.documento'), nullable=False)
     fechaventa = db.Column(db.Date, default=datetime.utcnow)
     estado     = db.Column(db.String(30), nullable=False, default='Pendiente de Pago')
+    # HU-76: como se pago la venta -- necesario para el cierre de caja
+    # (HU-75, pendiente) y para que los reportes reflejen la realidad
+    # de como entra el dinero, no solo el total.
+    metodo_pago = db.Column(db.String(20), nullable=True)
 
     cliente_rel = db.relationship('Cliente',      back_populates='ventas')
     detalles    = db.relationship('DetalleVenta', back_populates='venta', cascade='all, delete-orphan')
@@ -194,6 +203,9 @@ class BajaInventario(db.Model):
     idproducto = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
     cantidad   = db.Column(db.Integer, nullable=False)
     motivo     = db.Column(db.String(255), nullable=False)
+    # HU-71: categoria estructurada, separada del texto libre de motivo,
+    # para poder agrupar cuanto se pierde por vencimiento vs. dano vs. otro.
+    categoria  = db.Column(db.String(20), nullable=False, default='Otro')
     fecha      = db.Column(db.Date, default=datetime.utcnow)
 
     producto = db.relationship('Producto', backref='bajas')

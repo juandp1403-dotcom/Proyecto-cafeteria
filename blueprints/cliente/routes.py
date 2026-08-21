@@ -158,10 +158,19 @@ def confirmar():
             db.session.rollback()
             return jsonify({'error': f'Stock insuficiente para {prod.nombre}'}), 400
 
+    # HU-76: metodo de pago opcional, necesario para el futuro cierre
+    # de caja (HU-75) y para que los reportes reflejen como entra el
+    # dinero real, no solo el total.
+    metodos_validos = {'Efectivo', 'Tarjeta', 'Transferencia'}
+    metodo_pago = data.get('metodo_pago')
+    if metodo_pago not in metodos_validos:
+        metodo_pago = 'Efectivo'
+
     venta = Venta(
-        precio     = total,
-        cliente    = session['cliente_doc'],
-        fechaventa = datetime.utcnow(),
+        precio      = total,
+        cliente     = session['cliente_doc'],
+        fechaventa  = datetime.utcnow(),
+        metodo_pago = metodo_pago,
     )
     db.session.add(venta)
     db.session.flush()

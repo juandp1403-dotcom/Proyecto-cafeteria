@@ -139,8 +139,9 @@ def producto_nuevo():
                 os.makedirs(dest_dir, exist_ok=True)
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
                 imagen = lib_image
+    es_especial = request.form.get('es_especial') == '1'
     prod = Producto(nombre=nombre, precio=precio, stock=stock, imagen=imagen,
-                    stock_minimo=stock_minimo, costo=costo)
+                    stock_minimo=stock_minimo, costo=costo, es_especial=es_especial)
     db.session.add(prod)
     db.session.commit()
     flash(f'Producto "{nombre}" creado correctamente.', 'success')
@@ -170,6 +171,7 @@ def producto_editar(idproducto):
     prod.precio = nuevo_precio
     prod.stock  = nuevo_stock
     prod.costo  = nuevo_costo
+    prod.es_especial = request.form.get('es_especial') == '1'
     try:
         sm = int(request.form.get('stock_minimo', prod.stock_minimo))
         if sm > 0:
@@ -230,7 +232,12 @@ def producto_baja(idproducto):
         flash(f'No puedes dar de baja más unidades de las que hay en stock ({prod.stock}).', 'danger')
         return redirect(url_for('admin_panel.productos'))
 
-    baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo)
+    # HU-71: el select del formulario ya ofrece categorias fijas
+    # (Vencido/Dañado/Otro) -- se guardan en la columna estructurada
+    # 'categoria' ademas del texto libre en 'motivo', para poder agrupar
+    # reportes de perdida por categoria sin depender de texto libre.
+    categoria = motivo if motivo in ('Vencido', 'Dañado', 'Otro') else 'Otro'
+    baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo, categoria=categoria)
     db.session.add(baja)
     db.session.commit()
 

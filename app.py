@@ -198,6 +198,13 @@ def _migrar_esquema():
     _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)")
     _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)")
     _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)")
+    # HU-71: categorizar el motivo de baja de inventario
+    _ejecutar_migracion("ALTER TABLE bajainventario ADD COLUMN IF NOT EXISTS categoria VARCHAR(20) NOT NULL DEFAULT 'Otro'")
+    # HU-68: destacar producto especial/promocion del dia
+    _ejecutar_migracion("ALTER TABLE producto ADD COLUMN IF NOT EXISTS es_especial BOOLEAN NOT NULL DEFAULT FALSE")
+    _ejecutar_migracion("ALTER TABLE producto ADD COLUMN IF NOT EXISTS especial_hasta DATE")
+    # HU-76: metodo de pago de la venta
+    _ejecutar_migracion("ALTER TABLE venta ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(20)")
 
 
 def _clave_seed(env_var, default_dev, config_name):

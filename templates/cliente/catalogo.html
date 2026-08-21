@@ -60,6 +60,8 @@
            {% endif %}>
         {% if p.is_top %}
           <span class="badge position-absolute top-0 start-50 translate-middle" style="background:var(--sena-green)"><i class="bi bi-star-fill text-warning me-1"></i>Más vendido</span>
+        {% elif p.es_especial %}
+          <span class="badge position-absolute top-0 start-50 translate-middle bg-danger"><i class="bi bi-gift-fill me-1"></i>Especial</span>
         {% endif %}
         <div class="producto-emoji mb-2 mt-2">
           {% if p.imagen %}
