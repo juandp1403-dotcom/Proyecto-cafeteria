@@ -10,8 +10,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
 from models import db, Admin, Personal
 from extensions import limiter
-from apscheduler.schedulers.background import BackgroundScheduler
-import atexit
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
@@ -122,8 +120,6 @@ def create_app(config_name='default'):
         db.create_all()
         _migrar_esquema()
         _seed_datos_iniciales(config_name)
-
-    _iniciar_scheduler(app)
 
     return app
 
@@ -288,11 +284,6 @@ def _seed_datos_iniciales(config_name='development'):
         db.session.add_all(productos)
 
     db.session.commit()
-
-
-def _iniciar_scheduler(app):
-    # TODO: implementar reset diario de contadores si se necesita
-    pass
 
 
 if __name__ == '__main__':
