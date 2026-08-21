@@ -335,6 +335,126 @@ def productos_imagenes():
     return jsonify(imagenes)
 
 
+def _parsear_valor_numerico(valor, minimo=0, permitir_none=False):
+    """Convierte una celda de Excel a entero >= minimo. Acepta int/float
+    (Excel guarda numeros como float) y strings numericos. Devuelve
+    None si la celda esta vacia y permitir_none=True, o lanza ValueError."""
+    if valor is None or (isinstance(valor, str) and not valor.strip()):
+        if permitir_none:
+            return None
+        raise ValueError("valor vacio")
+    numero = int(float(valor))
+    if numero < minimo:
+        raise ValueError(f"debe ser >= {minimo}")
+    return numero
+
+
+@admin_bp.route('/productos/importar', methods=['GET', 'POST'])
+@login_required
+@requiere_permiso('escribir_todo')
+def productos_importar():
+    """HU nueva: carga masiva de productos desde un Excel. Columnas
+    reconocidas por nombre de encabezado (no por posicion), sin
+    distinguir mayusculas/acentos: nombre, precio, costo, stock,
+    stock_minimo. Si el nombre ya existe (comparacion exacta,
+    insensible a mayusculas), se ACTUALIZA ese producto; si no,
+    se crea uno nuevo."""
+    if request.method == 'GET':
+        return render_template('admin/productos_importar.html')
+
+    archivo = request.files.get('archivo')
+    if not archivo or not archivo.filename:
+        flash('Selecciona un archivo Excel (.xlsx).', 'danger')
+        return redirect(url_for('admin_panel.productos_importar'))
+    if not archivo.filename.lower().endswith('.xlsx'):
+        flash('El archivo debe ser .xlsx.', 'danger')
+        return redirect(url_for('admin_panel.productos_importar'))
+
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(archivo.stream, read_only=True, data_only=True)
+    except Exception:
+        flash('No se pudo leer el archivo. Confirma que sea un Excel valido (.xlsx).', 'danger')
+        return redirect(url_for('admin_panel.productos_importar'))
+
+    ws = wb.active
+    filas = ws.iter_rows(values_only=True)
+    try:
+        encabezados = next(filas)
+    except StopIteration:
+        flash('El archivo esta vacio.', 'danger')
+        return redirect(url_for('admin_panel.productos_importar'))
+
+    def _normalizar(texto):
+        return str(texto or '').strip().lower()
+
+    columnas = {_normalizar(v): i for i, v in enumerate(encabezados) if v is not None}
+    columnas_esperadas = {'nombre', 'precio', 'costo', 'stock', 'stock_minimo'}
+    if 'nombre' not in columnas or 'precio' not in columnas:
+        flash("El Excel debe tener al menos las columnas 'nombre' y 'precio' en la primera fila.", 'danger')
+        return redirect(url_for('admin_panel.productos_importar'))
+
+    productos_por_nombre = {
+        p.nombre.strip().lower(): p for p in Producto.query.all()
+    }
+
+    creados = 0
+    actualizados = 0
+    errores = []
+
+    for num_fila, fila in enumerate(filas, start=2):
+        if fila is None or all(c is None for c in fila):
+            continue
+        nombre = str(fila[columnas['nombre']] or '').strip()
+        if not nombre:
+            errores.append(f'Fila {num_fila}: falta el nombre, se omite.')
+            continue
+        try:
+            precio = _parsear_valor_numerico(fila[columnas['precio']], minimo=0)
+            costo = _parsear_valor_numerico(fila[columnas['costo']], minimo=0) if 'costo' in columnas else 0
+            stock = _parsear_valor_numerico(fila[columnas['stock']], minimo=0) if 'stock' in columnas else 0
+            stock_minimo = _parsear_valor_numerico(fila[columnas['stock_minimo']], minimo=1) if 'stock_minimo' in columnas else 10
+            if costo is None:
+                costo = 0
+            if stock is None:
+                stock = 0
+            if stock_minimo is None:
+                stock_minimo = 10
+        except ValueError as e:
+            errores.append(f'Fila {num_fila} ("{nombre}"): {e}')
+            continue
+
+        clave = nombre.lower()
+        existente = productos_por_nombre.get(clave)
+        if existente:
+            existente.precio = precio
+            existente.costo = costo
+            existente.stock = stock
+            existente.stock_minimo = stock_minimo
+            actualizados += 1
+        else:
+            nuevo = Producto(nombre=nombre, precio=precio, costo=costo,
+                            stock=stock, stock_minimo=stock_minimo)
+            db.session.add(nuevo)
+            productos_por_nombre[clave] = nuevo
+            creados += 1
+
+    db.session.commit()
+
+    columnas_ignoradas = set(columnas.keys()) - columnas_esperadas
+    resumen = f'Importacion completa: {creados} producto(s) creado(s), {actualizados} actualizado(s).'
+    if columnas_ignoradas:
+        resumen += f' Columnas no reconocidas e ignoradas: {", ".join(sorted(columnas_ignoradas))}.'
+    flash(resumen, 'success' if not errores else 'warning')
+    for err in errores[:20]:
+        flash(err, 'warning')
+    if len(errores) > 20:
+        flash(f'... y {len(errores) - 20} error(es) mas, no mostrados.', 'warning')
+
+    return redirect(url_for('admin_panel.productos'))
+
+
 @admin_bp.route('/productos/excel')
 @login_required
 @requiere_ver_pagina('productos')

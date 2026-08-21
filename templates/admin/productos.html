@@ -12,6 +12,9 @@
         <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
       </a>
       {% if puede('escribir_todo') %}
+      <a href="{{ url_for('admin_panel.productos_importar') }}" class="btn btn-outline-primary">
+        <i class="bi bi-upload me-1"></i>Importar Excel
+      </a>
       <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevo">
         <i class="bi bi-plus-circle me-1"></i>Nuevo Producto
       </button>
