@@ -87,18 +87,10 @@ class Venta(db.Model):
             num = 0
         return num
 
-    def to_dict(self):
-        return {
-            'idventa':            self.idventa,
-            'numero_pedido_diario': self.numero_pedido_diario,
-            'precio':             self.precio,
-            'cliente':            self.cliente,
-            'nombre_cliente':     self.cliente_rel.nombre if self.cliente_rel else '',
-            'ficha_cliente':      self.cliente_rel.ficha  if self.cliente_rel else '',
-            'fechaventa':         self.fechaventa.strftime('%d/%m/%Y') if self.fechaventa else '',
-            'estado':             self.estado,
-            'detalles':           [d.to_dict() for d in self.detalles]
-        }
+    # HU-22: to_dict() nunca se usa en ningun lado del codigo (verificado
+    # por grep) y dependia de numero_pedido_diario, que hace una consulta
+    # N+1 por venta -- se elimina en vez de dejarlo como codigo muerto
+    # con una trampa de rendimiento.
 
 class DetalleVenta(db.Model):
     __tablename__ = 'detalleventa'
@@ -210,12 +202,15 @@ class BajaInventario(db.Model):
 class Reporte(db.Model):
     __tablename__ = 'reporte'
     idreporte   = db.Column(db.Integer, primary_key=True)
-    idadmin     = db.Column(db.Integer, nullable=False)
+    idadmin     = db.Column(db.Integer, db.ForeignKey('admin.documento'), nullable=False)
     descripcion = db.Column(db.String(255), nullable=True)
     fecha       = db.Column(db.Date, nullable=True, default=datetime.utcnow)
     producto    = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
 
     prod_rel  = db.relationship('Producto', backref='reportes')
+    # HU-22: to_dict() referenciaba self.admin_rel sin que existiera la
+    # relacion (AttributeError garantizado si alguna vez se llamaba).
+    admin_rel = db.relationship('Admin', backref='reportes_creados')
 
     def to_dict(self):
         return {

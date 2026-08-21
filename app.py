@@ -139,150 +139,65 @@ def load_user(user_id):
     return None
 
 
+def _ejecutar_migracion(ddl):
+    """HU-46: ejecuta un DDL de migracion y loguea (en vez de silenciar)
+    si falla -- antes un ALTER TABLE fallido no dejaba ningun rastro,
+    la app arrancaba con un esquema distinto al esperado sin que nadie
+    se enterara hasta que algo fallaba mas adelante de forma confusa."""
+    from sqlalchemy import text
+    try:
+        db.session.execute(text(ddl))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logging.getLogger(__name__).warning(
+            "Migracion de esquema fallo (puede ser esperado si ya se aplico "
+            "antes, o requiere intervencion manual): %s -- %s", ddl, e
+        )
+
+
 def _migrar_esquema():
     """Ajusta el esquema de la BD segun el motor (solo PostgreSQL)."""
     uri = db.engine.url
     if uri.drivername not in ('postgresql', 'postgresql+psycopg', 'postgresql+psycopg2'):
         return
-    from sqlalchemy import text
-    try:
-        db.session.execute(text(
-            "ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna imagen si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna estado a venta si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado VARCHAR(30) DEFAULT 'Pendiente de Pago'"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna rol a admin si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE admin ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'admin'"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna stock_minimo a producto si no existe
-    try:
-        db.session.execute(text(
-            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INT NOT NULL DEFAULT 10"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Unificar el rol de entrega: 'entregador' no existe en PERMISOS, el valor
-    # canonico es 'despachador' (ver HU-33)
-    try:
-        db.session.execute(text(
-            "UPDATE admin SET rol = 'despachador' WHERE rol = 'entregador'"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Agregar columna costo a producto si no existe (el codigo ya la usa
-    # para calcular margen de venta)
-    try:
-        db.session.execute(text(
-            "ALTER TABLE producto ADD COLUMN IF NOT EXISTS costo INT NOT NULL DEFAULT 0"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+
+    _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)")
+    _ejecutar_migracion("ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)")
+    _ejecutar_migracion("ALTER TABLE venta ADD COLUMN IF NOT EXISTS estado VARCHAR(30) DEFAULT 'Pendiente de Pago'")
+    _ejecutar_migracion("ALTER TABLE admin ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'admin'")
+    _ejecutar_migracion("ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INT NOT NULL DEFAULT 10")
+    # Unificar el rol de entrega: 'entregador' no existe en PERMISOS, el
+    # valor canonico es 'despachador' (ver HU-33)
+    _ejecutar_migracion("UPDATE admin SET rol = 'despachador' WHERE rol = 'entregador'")
+    # El codigo ya usa producto.costo para calcular margen de venta
+    _ejecutar_migracion("ALTER TABLE producto ADD COLUMN IF NOT EXISTS costo INT NOT NULL DEFAULT 0")
     # Ampliar longitud de nombre de producto/cliente (el codigo permite
-    # hasta 100 caracteres; algunas bases quedaron con columnas mas
-    # cortas). Ampliar un VARCHAR nunca trunca datos existentes.
-    try:
-        db.session.execute(text(
-            "ALTER TABLE producto ALTER COLUMN nombre TYPE VARCHAR(100)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        db.session.execute(text(
-            "ALTER TABLE cliente ALTER COLUMN nombre TYPE VARCHAR(100)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Ampliar admin.email a 120 caracteres y asegurar que sea unico
-    # (el login busca por email; sin unicidad, dos cuentas podrian
-    # compartir correo).
-    try:
-        db.session.execute(text(
-            "ALTER TABLE admin ALTER COLUMN email TYPE VARCHAR(120)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        db.session.execute(text(
-            "ALTER TABLE admin ADD CONSTRAINT admin_email_key UNIQUE (email)"
-        ))
-        db.session.commit()
-    except Exception:
-        # Falla si ya existe la restriccion, o si hay correos duplicados
-        # sin resolver -- en ese caso el equipo debe depurarlos a mano
-        # antes de que esta restriccion pueda aplicarse.
-        db.session.rollback()
-    # Corrige un bug de esquema encontrado en la base real: 'reporte'
-    # tenia UNIQUE en idadmin y en producto, lo que impedia que un mismo
-    # admin creara mas de un reporte, o que un mismo producto apareciera
-    # en mas de un reporte, en toda la historia del sistema.
-    try:
-        db.session.execute(text(
-            "ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_idadmin_key"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        db.session.execute(text(
-            "ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_producto_key"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    # Ampliar personal.email a 120 caracteres (HU-54): el limite de 30
-    # hacia fallar la creacion de personal con un correo institucional
-    # normal.
-    try:
-        db.session.execute(text(
-            "ALTER TABLE personal ALTER COLUMN email TYPE VARCHAR(120)"
-        ))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # hasta 100 caracteres). Ampliar un VARCHAR nunca trunca datos.
+    _ejecutar_migracion("ALTER TABLE producto ALTER COLUMN nombre TYPE VARCHAR(100)")
+    _ejecutar_migracion("ALTER TABLE cliente ALTER COLUMN nombre TYPE VARCHAR(100)")
+    # admin.email: el login busca por email, sin unicidad dos cuentas
+    # podrian compartir correo. Si falla por duplicados existentes, el
+    # equipo debe depurarlos a mano (queda logueado, no silencioso).
+    _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN email TYPE VARCHAR(120)")
+    _ejecutar_migracion("ALTER TABLE admin ADD CONSTRAINT admin_email_key UNIQUE (email)")
+    # Bug de esquema encontrado en la base real: 'reporte' tenia UNIQUE
+    # en idadmin y en producto, impidiendo que un mismo admin creara mas
+    # de un reporte, o que un producto apareciera en mas de un reporte.
+    _ejecutar_migracion("ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_idadmin_key")
+    _ejecutar_migracion("ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_producto_key")
+    # HU-54: personal.email limitado a 30 hacia fallar la creacion de
+    # personal con un correo institucional normal.
+    _ejecutar_migracion("ALTER TABLE personal ALTER COLUMN email TYPE VARCHAR(120)")
     # HU-61: indices en las columnas mas consultadas (dashboard, catalogo,
     # reportes). CREATE INDEX no bloquea escrituras de forma relevante en
     # una tabla de este tamaño.
-    for ddl in (
-        "CREATE INDEX IF NOT EXISTS idx_venta_fechaventa ON venta (fechaventa)",
-        "CREATE INDEX IF NOT EXISTS idx_venta_estado ON venta (estado)",
-        "CREATE INDEX IF NOT EXISTS idx_venta_cliente ON venta (cliente)",
-        "CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)",
-        "CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)",
-        "CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)",
-    ):
-        try:
-            db.session.execute(text(ddl))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+    _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_venta_fechaventa ON venta (fechaventa)")
+    _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_venta_estado ON venta (estado)")
+    _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_venta_cliente ON venta (cliente)")
+    _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)")
+    _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)")
+    _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)")
 
 
 def _clave_seed(env_var, default_dev, config_name):
