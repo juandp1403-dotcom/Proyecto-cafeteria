@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Restablecer contraseña – Cafetería SENA{% endblock %}
+
+{% block body %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
+  <div class="card" style="width:100%;max-width:400px">
+    <div class="card-header-sena text-center">
+      <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Nueva contraseña</h5>
+    </div>
+    <div class="card-body p-4">
+      <form method="POST" action="{{ url_for('empleados.restablecer_clave', token=token) }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="clave">Nueva contraseña</label>
+          <input type="password" id="clave" class="form-control" name="clave" required minlength="8"
+                 placeholder="Mínimo 8 caracteres, letras y números">
+        </div>
+        <button type="submit" class="btn btn-sena w-100">
+          <i class="bi bi-check-circle me-2"></i>Actualizar contraseña
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
