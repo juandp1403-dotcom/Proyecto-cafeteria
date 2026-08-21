@@ -2,34 +2,34 @@
 {% set fprefix = fprefix|default('nuevo') %}
 
 <div class="mb-3">
-  <label class="form-label fw-semibold">Nombre del producto</label>
-  <input type="text" class="form-control" name="nombre" placeholder="Ej: Almuerzo Completo" required>
+  <label class="form-label fw-semibold" for="{{ fprefix }}_nombre">Nombre del producto</label>
+  <input type="text" id="{{ fprefix }}_nombre" class="form-control" name="nombre" placeholder="Ej: Almuerzo Completo" required>
 </div>
 <div class="row g-3 mb-3">
   <div class="col">
-    <label class="form-label fw-semibold">Precio de venta ($)</label>
-    <input type="number" class="form-control" name="precio" min="0" placeholder="8000" required>
+    <label class="form-label fw-semibold" for="{{ fprefix }}_precio">Precio de venta ($)</label>
+    <input type="number" id="{{ fprefix }}_precio" class="form-control" name="precio" min="0" placeholder="8000" required>
   </div>
   <div class="col">
-    <label class="form-label fw-semibold">Costo ($)</label>
-    <input type="number" class="form-control" name="costo" min="0" placeholder="5000">
+    <label class="form-label fw-semibold" for="{{ fprefix }}_costo">Costo ($)</label>
+    <input type="number" id="{{ fprefix }}_costo" class="form-control" name="costo" min="0" placeholder="5000">
   </div>
 </div>
 <div class="row g-3 mb-3">
   <div class="col">
-    <label class="form-label fw-semibold">Stock</label>
-    <input type="number" class="form-control" name="stock" min="0" placeholder="50" required>
+    <label class="form-label fw-semibold" for="{{ fprefix }}_stock">Stock</label>
+    <input type="number" id="{{ fprefix }}_stock" class="form-control" name="stock" min="0" placeholder="50" required>
   </div>
   <div class="col">
-    <label class="form-label fw-semibold">Alerta stock bajo</label>
-    <input type="number" class="form-control" name="stock_minimo" min="1" placeholder="10">
+    <label class="form-label fw-semibold" for="{{ fprefix }}_stock_minimo">Alerta stock bajo</label>
+    <input type="number" id="{{ fprefix }}_stock_minimo" class="form-control" name="stock_minimo" min="1" placeholder="10">
     <div class="form-text">A partir de esta cantidad se marca como "Poco stock".</div>
   </div>
 </div>
 
 <!-- Imagen: subir nueva o seleccionar de biblioteca -->
 <div class="mb-3">
-  <label class="form-label fw-semibold">Imagen del producto</label>
+  <label class="form-label fw-semibold" for="{{ fprefix }}_imagen_archivo">Imagen del producto</label>
   
   <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
     <li class="nav-item" role="presentation">
@@ -46,7 +46,7 @@
 
   <div class="tab-content">
     <div class="tab-pane fade show active" id="{{ fprefix }}TabSubir" role="tabpanel">
-      <input type="file" class="form-control" name="imagen" accept="image/png,image/jpeg,image/gif,image/webp">
+      <input type="file" id="{{ fprefix }}_imagen_archivo" class="form-control" name="imagen" accept="image/png,image/jpeg,image/gif,image/webp">
       <div class="form-text">PNG, JPG, GIF o WebP. Maximo 5 MB.</div>
     </div>
 
@@ -61,7 +61,7 @@
                onclick="seleccionarBiblioteca(this, '{{ fprefix }}')"
                style="cursor:pointer;border:2px solid transparent;border-radius:8px;overflow:hidden;transition:border-color .2s">
             <img src="{{ url_for('static', filename='imagenes/' + img) }}"
-                 alt="img" class="img-fluid rounded"
+                 alt="Imagen de biblioteca: {{ img }}" class="img-fluid rounded"
                  style="width:100%;height:64px;object-fit:cover;">
           </div>
         </div>

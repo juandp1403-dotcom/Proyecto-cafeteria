@@ -68,11 +68,11 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Nombre del vendedor / proveedor</label>
-            <input type="text" class="form-control" name="nombrevendedor" required>
+            <label class="form-label fw-semibold" for="compra-nombrevendedor">Nombre del vendedor / proveedor</label>
+            <input type="text" id="compra-nombrevendedor" class="form-control" name="nombrevendedor" required>
           </div>
 
-          <label class="form-label fw-semibold">Productos comprados</label>
+          <label class="form-label fw-semibold" for="select-producto-plantilla">Productos comprados</label>
           <div id="items-compra">
             <div class="row g-2 mb-2 item-row">
               <div class="col-7">

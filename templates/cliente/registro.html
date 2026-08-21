@@ -51,26 +51,26 @@
       <form method="POST" action="{{ url_for('cliente.registro') }}" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
-          <label class="form-label fw-semibold">
+          <label class="form-label fw-semibold" for="registro-documento">
             <i class="bi bi-person-vcard me-1" style="color:var(--sena-green)"></i>Número de Documento
           </label>
-          <input type="number" class="form-control form-control-lg" name="documento"
+          <input type="number" id="registro-documento" class="form-control form-control-lg" name="documento"
                  placeholder="Ej: 1012345678" required autofocus>
         </div>
 
         <div class="mb-3">
-          <label class="form-label fw-semibold">
+          <label class="form-label fw-semibold" for="registro-nombre">
             <i class="bi bi-person me-1" style="color:var(--sena-green)"></i>Nombre Completo
           </label>
-          <input type="text" class="form-control form-control-lg" name="nombre"
+          <input type="text" id="registro-nombre" class="form-control form-control-lg" name="nombre"
                  placeholder="Tu nombre" required>
         </div>
 
         <div class="mb-4">
-          <label class="form-label fw-semibold">
+          <label class="form-label fw-semibold" for="registro-ficha">
             <i class="bi bi-mortarboard me-1" style="color:var(--sena-green)"></i>Número de Ficha
           </label>
-          <input type="number" class="form-control form-control-lg" name="ficha"
+          <input type="number" id="registro-ficha" class="form-control form-control-lg" name="ficha"
                  placeholder="Ej: 2895461" required>
         </div>
 
