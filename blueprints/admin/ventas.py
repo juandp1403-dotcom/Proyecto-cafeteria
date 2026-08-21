@@ -110,6 +110,7 @@ def venta_entregado(idventa):
 @admin_bp.route('/ventas/excel')
 @login_required
 @requiere_ver_pagina('ventas')
+@requiere_permiso('exportar_datos_personales')
 def ventas_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side

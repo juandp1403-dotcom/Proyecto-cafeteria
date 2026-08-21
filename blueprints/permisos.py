@@ -3,29 +3,43 @@ from flask import abort, flash, redirect, url_for, current_app
 from flask_login import current_user
 
 
+PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes']
+
+# HU-59: 'usuarios' expone datos personales (documento, nombre, correo)
+# de todo el personal -- solo admin y auditor lo necesitan para su rol.
+# 'exportar_datos_personales' separa el permiso de solo-ver-la-pagina
+# del permiso de exportar el detalle completo (ej. Excel de ventas con
+# documento/ficha de cliente); un despachador puede ver la pagina de
+# ventas pero no exportar ese detalle.
 PERMISOS = {
     'admin': {
         'ver_todo': True,
         'escribir_todo': True,
+        'exportar_datos_personales': True,
+        'paginas': PAGINAS_ADMIN,
     },
     'auditor': {
         'ver_todo': True,
         'escribir_todo': False,
+        'exportar_datos_personales': True,
+        'paginas': PAGINAS_ADMIN,
     },
     'cajero': {
         'ver_todo': True,
         'escribir_todo': False,
         'aceptar_rechazar_venta': True,
         'generar_reporte': True,
+        'exportar_datos_personales': True,
+        'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'reportes'],
     },
     'despachador': {
         'ver_todo': False,
         'ver_solo': ['ventas'],
         'cambiar_estado_entrega': True,
+        'exportar_datos_personales': False,
+        'paginas': ['ventas'],
     },
 }
-
-PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes']
 
 
 def tipo_usuario_actual():
@@ -53,11 +67,7 @@ def puede_ver_pagina(nombre_pagina):
     rol = tipo_usuario_actual()
     if rol is None:
         return False
-    if rol in ('admin', 'auditor', 'cajero'):
-        return True
-    if rol == 'despachador':
-        return nombre_pagina in PERMISOS['despachador'].get('ver_solo', [])
-    return False
+    return nombre_pagina in PERMISOS.get(rol, {}).get('paginas', [])
 
 
 def requiere_permiso(permiso):
