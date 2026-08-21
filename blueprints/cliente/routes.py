@@ -26,11 +26,17 @@ def registro():
                 'cliente/registro.html',
                 error='Debes autorizar el tratamiento de tus datos personales conforme a la Ley 1581 de 2012 para continuar.')
 
+        # Las columnas son db.Integer (32 bits en PostgreSQL); un numero
+        # fuera de ese rango no es un documento/ficha valido y antes
+        # llegaba sin validar hasta el driver de BD, donde SQLite lo
+        # rechazaba con un OverflowError sin manejar (500).
         try:
             doc   = int(doc)
             ficha = int(ficha)
+            if not (0 < doc <= 2_147_483_647) or not (0 < ficha <= 2_147_483_647):
+                raise ValueError
         except ValueError:
-            return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos.')
+            return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos válidos.')
 
         # HU-08: si el documento ya existe, exigir que nombre y ficha
         # coincidan exactamente con lo guardado antes de reutilizar esa
