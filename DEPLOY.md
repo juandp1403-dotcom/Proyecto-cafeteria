@@ -1,5 +1,31 @@
 # Despliegue
 
+## Checklist previo a producción (HU-31)
+
+Revisar (y marcar informalmente, aunque sea por chat con el equipo)
+antes de cada despliegue a producción:
+
+- [ ] `SECRET_KEY` configurada, real, de 32+ caracteres (no el valor
+      por defecto del código) — ver sección "SECRET_KEY" más abajo.
+- [ ] `SSH_HOST`/`DATABASE_URL` apuntan a la base de datos real
+      persistente, no a un valor vacío que caería en SQLite efímero.
+- [ ] `SSH_HOST_KEY` configurada si se usa túnel SSH — ver sección
+      correspondiente más abajo.
+- [ ] Contraseñas de las cuentas admin/cajero/despachador NO son las
+      de ejemplo del `.env.example` (`Admin123`, etc.).
+- [ ] HTTPS activo de punta a punta: el dominio responde por HTTPS
+      (lo maneja Coolify/el proxy reverso) y `X-Forwarded-Proto` llega
+      correctamente para que `Strict-Transport-Security` se emita.
+- [ ] **Backup de la base de datos tomado antes de un cambio grande**
+      (`pg_dump`) — hoy no hay backup automático configurado; hasta
+      que exista, cualquiera que vaya a correr una migración de
+      esquema debe sacar un dump manual primero.
+- [ ] Los tests pasan (`pytest tests/`) y el lint no tiene errores
+      (`ruff check .`) antes de fusionar a `main`.
+- [ ] Se revisó qué cambia en la base de datos con este despliegue
+      (ver `7-historias_base_datos_guia.docx` si aplica) y quién lo
+      va a aplicar.
+
 ## Verificar que la app está usando la base de datos real (no SQLite efímero)
 
 Antes de dar por bueno un despliegue en producción:
