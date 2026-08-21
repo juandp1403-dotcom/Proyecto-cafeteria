@@ -9,17 +9,25 @@ from datetime import timedelta
 _DB_DIR = tempfile.mkdtemp(prefix="cafeteria_test_cookies_")
 _DB_PATH = os.path.join(_DB_DIR, "test_cafeteria.db")
 os.environ['DATABASE_URL'] = f"sqlite:///{_DB_PATH}"
+os.environ.setdefault('SECRET_KEY', 'a' * 40)  # HU-16: produccion exige 32+ caracteres
 os.environ.pop('SSH_HOST', None)
 
 import pytest
 
-from app import create_app
 from models import db
 
 
 @pytest.fixture()
 def app_production():
-    application = create_app('production')
+    # config.py lee SECRET_KEY como atributo de clase al importarse, y el
+    # modulo puede haber quedado cacheado por otro test que lo importo
+    # antes de que fijaramos la variable de entorno aqui arriba.
+    import importlib
+    import config as config_module
+    importlib.reload(config_module)
+    import app as app_module
+    importlib.reload(app_module)
+    application = app_module.create_app('production')
     application.config['WTF_CSRF_ENABLED'] = False
     application.config['TESTING'] = True
     yield application

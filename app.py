@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -16,6 +17,18 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
     app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'productos')
+
+    if config_name == 'production':
+        secret = app.config.get('SECRET_KEY') or ''
+        if secret == 'cambia-esta-clave' or len(secret) < 32:
+            raise RuntimeError(
+                "SECRET_KEY no esta configurada correctamente para produccion "
+                "(falta, es el valor por defecto del codigo, o tiene menos de "
+                "32 caracteres). Sin una clave real, las sesiones y los tokens "
+                "CSRF pueden falsificarse. Genera una con: "
+                "python -c \"import secrets; print(secrets.token_hex(32))\" "
+                "y configurala en SECRET_KEY."
+            )
 
     # ── Tunel SSH → DB ──
     puerto = _abrir_tunel(config_name)
@@ -50,6 +63,10 @@ def create_app(config_name='default'):
     app.register_blueprint(admin_bp)
 
     registrar_context_processor(app)
+
+    @app.context_processor
+    def inject_anio_actual():
+        return dict(anio_actual=datetime.utcnow().year)
 
     @app.route('/')
     def index():

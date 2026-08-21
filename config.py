@@ -74,7 +74,7 @@ def _cerrar_tunel():
 
 
 def _construir_db_url(puerto_local):
-    user = os.environ.get('DB_USER', 'juan')
+    user = os.environ.get('DB_USER', 'postgres')
     password = os.environ.get('DB_PASS', '')
     name = os.environ.get('DB_NAME', 'cafeteria')
     if password:

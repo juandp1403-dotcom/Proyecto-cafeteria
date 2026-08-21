@@ -32,3 +32,26 @@ Si el despliegue usa `SSH_HOST` para el túnel hacia la base de datos:
 4. En desarrollo local, si falta, solo se imprime una advertencia y el
    túnel sigue funcionando sin verificar — para no bloquear a alguien
    que recién está configurando su entorno local.
+
+## Imágenes subidas: usar un volumen persistente (HU-63)
+
+`static/imagenes/` (biblioteca) y `static/productos/` (imágenes activas
+de cada producto) ya no se versionan en git — solo queda un `.gitkeep`
+para que las carpetas existan en un clon nuevo. Si no se monta un
+volumen persistente, cada redeploy del contenedor borra las imágenes
+subidas por el equipo.
+
+En Coolify (o el orquestador que se use), monta un volumen para ambas
+rutas, por ejemplo en `docker-compose.yml`:
+
+```yaml
+services:
+  web:
+    volumes:
+      - imagenes_productos:/app/static/imagenes
+      - imagenes_activas:/app/static/productos
+
+volumes:
+  imagenes_productos:
+  imagenes_activas:
+```
