@@ -1,5 +1,6 @@
 import os
 import logging
+import secrets
 from datetime import datetime
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
@@ -120,7 +121,7 @@ def create_app(config_name='default'):
     with app.app_context():
         db.create_all()
         _migrar_esquema()
-        _seed_datos_iniciales()
+        _seed_datos_iniciales(config_name)
 
     _iniciar_scheduler(app)
 
@@ -256,9 +257,38 @@ def _migrar_esquema():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # Ampliar personal.email a 120 caracteres (HU-54): el limite de 30
+    # hacia fallar la creacion de personal con un correo institucional
+    # normal.
+    try:
+        db.session.execute(text(
+            "ALTER TABLE personal ALTER COLUMN email TYPE VARCHAR(120)"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
-def _seed_datos_iniciales():
+def _clave_seed(env_var, default_dev, config_name):
+    """HU-15: en produccion, si la contraseña no esta configurada por
+    variable de entorno, se genera una aleatoria y se imprime UNA VEZ
+    en el log de arranque, en vez de usar una contraseña predecible
+    (Admin123, etc.) que queda documentada en el propio repositorio.
+    En desarrollo se mantiene el valor por defecto para no complicar
+    el flujo local."""
+    valor = os.environ.get(env_var)
+    if valor:
+        return valor
+    if config_name == 'production':
+        generada = secrets.token_urlsafe(12)
+        print(f"[seed] ADVERTENCIA: {env_var} no esta configurada. Se genero "
+              f"una contraseña aleatoria para esta cuenta -- anotala ahora, "
+              f"no se volvera a mostrar: {generada}")
+        return generada
+    return default_dev
+
+
+def _seed_datos_iniciales(config_name='development'):
     from models import Admin, Producto
     from werkzeug.security import generate_password_hash
 
@@ -273,7 +303,7 @@ def _seed_datos_iniciales():
             documento=doc_admin,
             nombre=os.environ.get('ADMIN_NOMBRE', 'Administrador SENA'),
             email=os.environ.get('ADMIN_EMAIL', 'admin@cafeteria.com'),
-            clave=generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'Admin123')),
+            clave=generate_password_hash(_clave_seed('ADMIN_PASSWORD', 'Admin123', config_name)),
             rol='admin',
         ))
 
@@ -282,7 +312,7 @@ def _seed_datos_iniciales():
             documento=doc_cajero,
             nombre=os.environ.get('CAJERO_NOMBRE', 'Cajero Principal'),
             email=os.environ.get('CAJERO_EMAIL', 'cajero@cafeteria.com'),
-            clave=generate_password_hash(os.environ.get('CAJERO_PASSWORD', 'Cajero123')),
+            clave=generate_password_hash(_clave_seed('CAJERO_PASSWORD', 'Cajero123', config_name)),
             rol='cajero',
         ))
 
@@ -291,7 +321,7 @@ def _seed_datos_iniciales():
             documento=doc_entregador,
             nombre=os.environ.get('ENTREGADOR_NOMBRE', 'Entregador Principal'),
             email=os.environ.get('ENTREGADOR_EMAIL', 'entregador@cafeteria.com'),
-            clave=generate_password_hash(os.environ.get('ENTREGADOR_PASSWORD', 'Entregador123')),
+            clave=generate_password_hash(_clave_seed('ENTREGADOR_PASSWORD', 'Entregador123', config_name)),
             rol='despachador',
         ))
 

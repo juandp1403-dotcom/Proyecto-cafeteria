@@ -587,6 +587,17 @@ def usuarios():
     return render_template('admin/usuarios.html', admins=admins, personal_list=personal_list)
 
 
+def _validar_password(clave):
+    """HU-17: minimo 8 caracteres, combinando letras y numeros. El
+    minlength del HTML es solo una ayuda visual, no protege nada por si
+    solo -- un request directo a la ruta lo saltaba por completo."""
+    if len(clave) < 8:
+        return 'La contraseña debe tener al menos 8 caracteres.'
+    if not any(c.isalpha() for c in clave) or not any(c.isdigit() for c in clave):
+        return 'La contraseña debe combinar letras y números.'
+    return None
+
+
 @admin_bp.route('/usuarios/nuevo', methods=['POST'])
 @login_required
 @requiere_permiso('escribir_todo')
@@ -601,15 +612,28 @@ def usuario_nuevo():
         flash('Todos los campos son obligatorios.', 'danger')
         return redirect(url_for('admin_panel.usuarios'))
 
+    # HU-53: un documento no numerico ya no lanza una excepcion sin
+    # capturar (500), se rechaza con un mensaje claro.
+    try:
+        doc_int = int(doc)
+    except ValueError:
+        flash('El documento debe ser un valor numerico.', 'danger')
+        return redirect(url_for('admin_panel.usuarios'))
+
+    error_clave = _validar_password(clave)
+    if error_clave:
+        flash(error_clave, 'danger')
+        return redirect(url_for('admin_panel.usuarios'))
+
     if tipo_cuenta == 'personal':
         rol = request.form.get('rol_personal', 'cajero')
         if Personal.query.filter_by(email=email).first():
             flash('Ya existe un personal con ese correo.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
-        if Personal.query.filter_by(docpersonal=int(doc)).first():
+        if Personal.query.filter_by(docpersonal=doc_int).first():
             flash('Ya existe un personal con ese documento.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
-        p = Personal(docpersonal=int(doc), nombre=nombre, email=email, clave='', rol=rol)
+        p = Personal(docpersonal=doc_int, nombre=nombre, email=email, clave='', rol=rol)
         p.set_password(clave)
         db.session.add(p)
         db.session.commit()
@@ -618,7 +642,12 @@ def usuario_nuevo():
         if Admin.query.filter_by(email=email).first():
             flash('Ya existe un usuario con ese correo.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
-        admin = Admin(documento=int(doc), nombre=nombre, email=email, clave='')
+        # HU-53: antes solo se validaba email duplicado para admin;
+        # un documento repetido lanzaba IntegrityError sin capturar (500).
+        if Admin.query.filter_by(documento=doc_int).first():
+            flash('Ya existe un usuario con ese documento.', 'danger')
+            return redirect(url_for('admin_panel.usuarios'))
+        admin = Admin(documento=doc_int, nombre=nombre, email=email, clave='')
         admin.set_password(clave)
         db.session.add(admin)
         db.session.commit()
@@ -642,6 +671,10 @@ def usuario_editar(documento):
             p.rol = nuevo_rol
         nueva_clave = request.form.get('clave', '').strip()
         if nueva_clave:
+            error_clave = _validar_password(nueva_clave)
+            if error_clave:
+                flash(error_clave, 'danger')
+                return redirect(url_for('admin_panel.usuarios'))
             p.set_password(nueva_clave)
         db.session.commit()
         flash('Personal actualizado correctamente.', 'success')
@@ -651,6 +684,10 @@ def usuario_editar(documento):
         admin.email  = request.form.get('email', admin.email).strip()
         nueva_clave  = request.form.get('clave', '').strip()
         if nueva_clave:
+            error_clave = _validar_password(nueva_clave)
+            if error_clave:
+                flash(error_clave, 'danger')
+                return redirect(url_for('admin_panel.usuarios'))
             admin.set_password(nueva_clave)
         db.session.commit()
         flash('Usuario actualizado correctamente.', 'success')

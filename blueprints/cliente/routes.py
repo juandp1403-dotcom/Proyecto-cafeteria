@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, session, jsonify, flash
+from flask import render_template, request, redirect, url_for, session, jsonify, flash, current_app
 from datetime import datetime
 from flask_login import current_user
 from models import db, Producto, Cliente, Venta, DetalleVenta
@@ -24,13 +24,23 @@ def registro():
         except ValueError:
             return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos.')
 
+        # HU-08: si el documento ya existe, exigir que nombre y ficha
+        # coincidan exactamente con lo guardado antes de reutilizar esa
+        # identidad -- antes cualquiera que conociera un documento ajeno
+        # podia sobrescribir el nombre y ver el historial de esa persona.
         cliente = Cliente.query.get(doc)
         if not cliente:
             cliente = Cliente(documento=doc, nombre=nombre, ficha=ficha)
             db.session.add(cliente)
-        else:
-            cliente.nombre = nombre
-            cliente.ficha  = ficha
+        elif cliente.nombre.strip().lower() != nombre.strip().lower() or cliente.ficha != ficha:
+            current_app.logger.warning(
+                'Intento de registro con documento existente sin coincidencia: documento=%s', doc
+            )
+            return render_template('cliente/registro.html', error=(
+                'Ese documento ya está registrado con otro nombre o ficha. '
+                'Verifica que los escribiste exactamente igual a tu primer registro, '
+                'o pide ayuda a un cajero.'
+            ))
         db.session.commit()
 
         session['cliente_doc']    = doc

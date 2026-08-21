@@ -10,6 +10,7 @@ _DB_DIR = tempfile.mkdtemp(prefix="cafeteria_test_cookies_")
 _DB_PATH = os.path.join(_DB_DIR, "test_cafeteria.db")
 os.environ['DATABASE_URL'] = f"sqlite:///{_DB_PATH}"
 os.environ.setdefault('SECRET_KEY', 'a' * 40)  # HU-16: produccion exige 32+ caracteres
+os.environ.setdefault('ADMIN_PASSWORD', 'Admin123')  # HU-15: sin esto, produccion genera una aleatoria
 os.environ.pop('SSH_HOST', None)
 
 import pytest

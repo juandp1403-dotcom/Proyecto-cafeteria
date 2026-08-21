@@ -132,7 +132,7 @@ class Personal(UserMixin, db.Model):
     docpersonal = db.Column(db.Integer, primary_key=True)
     nombre      = db.Column(db.String(50))
     clave       = db.Column(db.String(255))
-    email       = db.Column(db.String(30))
+    email       = db.Column(db.String(120))
     rol         = db.Column(db.String(15))
 
     def get_id(self):
