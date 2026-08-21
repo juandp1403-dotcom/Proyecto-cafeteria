@@ -89,7 +89,7 @@ def test_catalogo_muestra_badge_especial(app, client):
         prod = Producto.query.filter_by(nombre='Café Tinto').first()
         prod.es_especial = True
         db.session.commit()
-    client.post('/cliente/registro', data={'documento': '95001', 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': '95001', 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
     resp = client.get('/cliente/catalogo')
     assert 'Especial'.encode() in resp.data
 
@@ -97,7 +97,7 @@ def test_catalogo_muestra_badge_especial(app, client):
 # ── HU-76 ──────────────────────────────────────────────────────────
 
 def test_venta_guarda_metodo_pago_enviado(app, client):
-    client.post('/cliente/registro', data={'documento': '95002', 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': '95002', 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
     resp = client.post('/cliente/confirmar', json={
         'items': [{'idproducto': 1, 'cantidad': 1}], 'metodo_pago': 'Tarjeta',
     })
@@ -107,7 +107,7 @@ def test_venta_guarda_metodo_pago_enviado(app, client):
 
 
 def test_venta_sin_metodo_pago_usa_efectivo_por_defecto(app, client):
-    client.post('/cliente/registro', data={'documento': '95003', 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': '95003', 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
     resp = client.post('/cliente/confirmar', json={
         'items': [{'idproducto': 1, 'cantidad': 1}],
     })

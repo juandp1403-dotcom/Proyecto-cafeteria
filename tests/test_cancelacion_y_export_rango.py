@@ -45,7 +45,7 @@ def _login_admin(client):
 
 
 def _crear_pedido(client, doc='90001'):
-    client.post('/cliente/registro', data={'documento': doc, 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': doc, 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
     with client.session_transaction():
         pass
     resp = client.post('/cliente/confirmar', json={
@@ -77,7 +77,7 @@ def test_no_puede_cancelar_pedido_de_otro_cliente(app, client):
     idventa = _crear_pedido(client, doc='90002')
     # Se identifica como OTRO cliente distinto
     client.get('/cliente/salir')
-    client.post('/cliente/registro', data={'documento': '90003', 'nombre': 'Otro', 'ficha': '2'})
+    client.post('/cliente/registro', data={'documento': '90003', 'nombre': 'Otro', 'ficha': '2', 'autorizo_datos': '1'})
 
     resp = client.post(f'/cliente/cancelar/{idventa}', follow_redirects=True)
     assert resp.status_code == 200
@@ -92,7 +92,7 @@ def test_no_puede_cancelar_pedido_ya_aceptado(app, client):
     client.post(f'/admin/ventas/aceptar/{idventa}')
 
     client.get('/cliente/salir')
-    client.post('/cliente/registro', data={'documento': '90004', 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': '90004', 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
     resp = client.post(f'/cliente/cancelar/{idventa}', follow_redirects=True)
     assert resp.status_code == 200
 

@@ -1,25 +1,32 @@
 from functools import wraps
-from flask import abort, flash, redirect, url_for, current_app
+from flask import abort, current_app
 from flask_login import current_user
 
 
 PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes', 'auditoria']
 
-# Nota HU-59: la restriccion de datos personales (enmascarar
-# documento/nombre/ficha por rol) ya la resolvio el equipo en
-# origin/main (commit 0444005, 'ver_datos_personales' + helpers de
-# enmascaramiento) -- no se duplica aqui para no chocar al hacer merge.
-# 'auditoria' es nueva (HU-20, no relacionada con HU-59) y solo la ven
-# admin/auditor.
+# HU-59, combinado: el equipo (Juanes, commit 0444005) resolvio el
+# enmascarado de datos personales ('ver_datos_personales' + helpers
+# iniciales()/doc_enmascarado()). A eso le faltaba el otro criterio de
+# aceptacion de la historia original: "un cajero ya no puede ABRIR la
+# gestion de usuarios del personal" -- por eso 'usuarios' se quita de
+# las paginas de cajero, mientras que auditor (que necesita ver el
+# listado, solo que sin datos completos) la conserva enmascarada.
+# 'auditoria' es HU-20, sin relacion con HU-59, solo para admin/auditor.
 PERMISOS = {
     'admin': {
         'ver_todo': True,
         'escribir_todo': True,
+        'aceptar_rechazar_venta': True,
+        'cambiar_estado_entrega': True,
+        'generar_reporte': True,
+        'ver_datos_personales': True,
         'paginas': PAGINAS_ADMIN,
     },
     'auditor': {
         'ver_todo': True,
         'escribir_todo': False,
+        'ver_datos_personales': False,
         'paginas': PAGINAS_ADMIN,
     },
     'cajero': {
@@ -27,12 +34,14 @@ PERMISOS = {
         'escribir_todo': False,
         'aceptar_rechazar_venta': True,
         'generar_reporte': True,
-        'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes'],
+        'ver_datos_personales': False,
+        'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'reportes'],
     },
     'despachador': {
         'ver_todo': False,
         'ver_solo': ['ventas'],
         'cambiar_estado_entrega': True,
+        'ver_datos_personales': False,
         'paginas': ['ventas'],
     },
 }
@@ -99,4 +108,21 @@ def registrar_context_processor(app):
             puede=puede,
             puede_ver_pagina=puede_ver_pagina,
             tipo_usuario_actual=tipo_usuario_actual,
+            iniciales=iniciales,
+            doc_enmascarado=doc_enmascarado,
         )
+
+
+# ── HU-59: helpers de enmascaramiento de datos personales ──
+def iniciales(nombre):
+    """Iniciales de un nombre para mostrar cuando no hay permiso de ver datos."""
+    if not nombre:
+        return '—'
+    partes = str(nombre).split()
+    return '.'.join(p[0].upper() for p in partes[:2]) + '.'
+
+
+def doc_enmascarado(doc):
+    """Documento/ficha parcialmente oculto: ***** + ultimos 3 digitos."""
+    s = str(doc) if doc is not None else ''
+    return ('*****' + s[-3:]) if len(s) > 3 else '*****'

@@ -1,8 +1,9 @@
 from flask import render_template, redirect, url_for, request, send_file, flash
 from flask_login import login_required
 from datetime import datetime, timedelta
-from models import db, Venta, DetalleVenta, ajustar_stock
-from blueprints.permisos import requiere_permiso, requiere_ver_pagina
+from models import db, expr_fecha, Venta, DetalleVenta, ajustar_stock
+from blueprints.permisos import requiere_permiso, requiere_ver_pagina, puede, iniciales, doc_enmascarado
+from utils import ahora_bogota, hoy_bogota
 from . import admin_bp
 
 
@@ -11,11 +12,9 @@ from . import admin_bp
 @login_required
 @requiere_ver_pagina('ventas')
 def ventas():
-    from sqlalchemy import cast, Date
-
     page = request.args.get('page', 1, type=int)
     periodo = request.args.get('periodo', 'todos')
-    hoy = datetime.utcnow().date()
+    hoy = hoy_bogota()
 
     query = Venta.query.options(
         db.joinedload(Venta.cliente_rel),
@@ -23,16 +22,16 @@ def ventas():
     )
 
     if periodo == 'dia':
-        query = query.filter(cast(Venta.fechaventa, Date) == hoy)
+        query = query.filter(expr_fecha(Venta.fechaventa) == hoy)
     elif periodo == 'semana':
         desde = hoy - timedelta(days=6)
-        query = query.filter(cast(Venta.fechaventa, Date) >= desde)
+        query = query.filter(expr_fecha(Venta.fechaventa) >= desde)
     elif periodo == 'mes':
         desde = hoy.replace(day=1)
-        query = query.filter(cast(Venta.fechaventa, Date) >= desde)
+        query = query.filter(expr_fecha(Venta.fechaventa) >= desde)
     elif periodo == 'anio':
         desde = hoy.replace(month=1, day=1)
-        query = query.filter(cast(Venta.fechaventa, Date) >= desde)
+        query = query.filter(expr_fecha(Venta.fechaventa) >= desde)
 
     ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15, error_out=False)
 
@@ -114,14 +113,13 @@ def ventas_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
-    from sqlalchemy import cast, Date
 
     # HU-27: rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD).
     # Sin parametros, mantiene el comportamiento original (solo hoy).
     MAX_FILAS_EXCEL = 5000
     desde_str = request.args.get('desde')
     hasta_str = request.args.get('hasta')
-    hoy = datetime.utcnow().date()
+    hoy = hoy_bogota()
     try:
         desde = datetime.strptime(desde_str, '%Y-%m-%d').date() if desde_str else hoy
         hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date() if hasta_str else hoy
@@ -131,7 +129,7 @@ def ventas_excel():
     ventas = (Venta.query
               .options(db.joinedload(Venta.cliente_rel),
                        db.joinedload(Venta.detalles).joinedload(DetalleVenta.producto))
-              .filter(cast(Venta.fechaventa, Date) >= desde, cast(Venta.fechaventa, Date) <= hasta)
+              .filter(expr_fecha(Venta.fechaventa) >= desde, expr_fecha(Venta.fechaventa) <= hasta)
               .order_by(Venta.idventa.asc())
               .limit(MAX_FILAS_EXCEL)
               .all())
@@ -156,14 +154,22 @@ def ventas_excel():
         cell.alignment = header_align
         cell.border = thin_border
 
+    # HU-59: sin el permiso ver_datos_personales, el Excel exporta
+    # nombre/documento/ficha enmascarados en vez de bloquear la descarga.
+    ver_datos = puede('ver_datos_personales')
+
     for row_idx, v in enumerate(ventas, 2):
         productos_str = ', '.join(
             f"{d.producto.nombre} x{d.cantidad}" for d in v.detalles if d.producto
         )
+        nombre_cliente = (v.cliente_rel.nombre if v.cliente_rel else '') if ver_datos \
+            else iniciales(v.cliente_rel.nombre if v.cliente_rel else '')
+        doc_cliente = v.cliente if ver_datos else doc_enmascarado(v.cliente)
+        ficha_cliente = (v.cliente_rel.ficha if v.cliente_rel else '') if ver_datos else '*****'
         ws.cell(row=row_idx, column=1, value=row_idx - 1).border = thin_border
-        ws.cell(row=row_idx, column=2, value=v.cliente_rel.nombre if v.cliente_rel else '').border = thin_border
-        ws.cell(row=row_idx, column=3, value=v.cliente).border = thin_border
-        ws.cell(row=row_idx, column=4, value=v.cliente_rel.ficha if v.cliente_rel else '').border = thin_border
+        ws.cell(row=row_idx, column=2, value=nombre_cliente).border = thin_border
+        ws.cell(row=row_idx, column=3, value=doc_cliente).border = thin_border
+        ws.cell(row=row_idx, column=4, value=ficha_cliente).border = thin_border
         ws.cell(row=row_idx, column=5, value=productos_str).border = thin_border
         ws.cell(row=row_idx, column=6, value=v.precio).border = thin_border
         ws.cell(row=row_idx, column=7, value=v.estado).border = thin_border
@@ -181,7 +187,7 @@ def ventas_excel():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fecha = datetime.now().strftime('%Y-%m-%d')
+    fecha = ahora_bogota().strftime('%Y-%m-%d')
     return send_file(buf, as_attachment=True,
                      download_name=f"ventas_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

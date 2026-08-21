@@ -1,8 +1,8 @@
 from flask import render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from datetime import datetime
 from models import db, Producto, Compra, DetalleCompra, ajustar_stock
 from blueprints.permisos import requiere_permiso, requiere_ver_pagina
+from utils import hoy_bogota
 from . import admin_bp
 
 
@@ -15,7 +15,7 @@ def compras():
     compras = (Compra.query
                .order_by(Compra.fechacompra.desc())
                .paginate(page=page, per_page=20, error_out=False))
-    productos = Producto.query.order_by(Producto.nombre).all()
+    productos = Producto.query.filter(Producto.activo.is_(True)).order_by(Producto.nombre).all()
     return render_template('admin/compras.html', compras=compras, productos=productos)
 
 
@@ -41,13 +41,15 @@ def compra_nueva():
             continue
         prod = Producto.query.get(pid_int)
         if prod and cant_int > 0:
-            total += prod.precio * cant_int
+            # HU-37: la compra se registra al COSTO real del producto,
+            # no al precio de venta.
+            total += prod.costo * cant_int
             detalles.append((prod, cant_int))
 
     compra = Compra(
         nombrevendedor = vendedor,
         precio         = total,
-        fechacompra    = datetime.utcnow(),
+        fechacompra    = hoy_bogota(),
         documentoadmin = current_user.documento
     )
     db.session.add(compra)

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Solicitud de Supresión – Cafetería SENA{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:520px">
+  <div class="card">
+    <div class="card-header-sena">
+      <i class="bi bi-trash3 me-2"></i>Solicitud de Supresión de Datos
+    </div>
+    <div class="card-body p-4">
+      <p class="small text-muted">
+        Conforme a la <strong>Ley 1581 de 2012</strong>, como titular de los datos puedes solicitar
+        la eliminación de tu información personal. Tu solicitud quedará registrada con fecha y será
+        procesada manualmente por el administrador.
+      </p>
+      <div class="alert alert-warning py-2 small">
+        <i class="bi bi-info-circle me-1"></i>
+        Los registros contables de pedidos ya realizados deben conservarse por obligación legal,
+        pero quedarán desvinculados de tu identidad.
+      </div>
+
+      <form method="POST" action="{{ url_for('cliente.supresion') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Solicitante</label>
+          <input type="text" class="form-control" value="{{ session.get('cliente_nombre') }} (Doc. {{ session.get('cliente_doc') }})" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="motivo">Motivo de la solicitud <span class="text-muted">(opcional)</span></label>
+          <textarea class="form-control" id="motivo" name="motivo" rows="3"
+                    placeholder="Ej: ya no pertenezco al SENA y quiero eliminar mis datos..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-danger w-100">
+          <i class="bi bi-trash3 me-1"></i>Enviar solicitud
+        </button>
+      </form>
+
+      <a href="{{ url_for('cliente.catalogo') }}" class="btn btn-outline-secondary w-100 mt-2">
+        <i class="bi bi-arrow-left me-1"></i>Cancelar y volver al menú
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -42,7 +42,7 @@ def _login_admin(client):
 
 
 def _pedido(client, doc):
-    client.post('/cliente/registro', data={'documento': doc, 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': doc, 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
     resp = client.post('/cliente/confirmar', json={'items': [{'idproducto': 1, 'cantidad': 1}]})
     return resp.get_json()['idventa']
 

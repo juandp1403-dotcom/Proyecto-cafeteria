@@ -44,7 +44,7 @@ def _login_admin(client):
 
 
 def _login_cliente(client, doc='88001'):
-    client.post('/cliente/registro', data={'documento': doc, 'nombre': 'QA', 'ficha': '1'})
+    client.post('/cliente/registro', data={'documento': doc, 'nombre': 'QA', 'ficha': '1', 'autorizo_datos': '1'})
 
 
 # ── HU-47 ──────────────────────────────────────────────────────────

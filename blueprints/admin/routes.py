@@ -1,8 +1,9 @@
 from flask import render_template
 from flask_login import login_required
-from datetime import datetime, timedelta
-from models import db, Producto, Venta, DetalleVenta
+from datetime import timedelta
+from models import db, expr_fecha, Producto, Venta, DetalleVenta
 from blueprints.permisos import requiere_ver_pagina
+from utils import hoy_bogota
 from . import admin_bp
 
 
@@ -26,31 +27,31 @@ def _ultimos_12_meses(hoy):
 @login_required
 @requiere_ver_pagina('dashboard')
 def dashboard():
-    from sqlalchemy import func, cast, Date, desc
+    from sqlalchemy import func, desc
 
-    hoy = datetime.utcnow().date()
+    hoy = hoy_bogota()
     estados_pagados = ('Pagado/Preparando', 'Preparado', 'Entregado')
 
     # KPIs — solo pedidos pagados / entregados
     total_ventas = int(db.session.query(func.coalesce(func.sum(Venta.precio), 0)).filter(
-        cast(Venta.fechaventa, Date) == hoy,
+        expr_fecha(Venta.fechaventa) == hoy,
         Venta.estado.in_(estados_pagados)
     ).scalar())
     ventas_hoy = int(db.session.query(func.count(Venta.idventa)).filter(
-        cast(Venta.fechaventa, Date) == hoy,
+        expr_fecha(Venta.fechaventa) == hoy,
         Venta.estado.in_(estados_pagados)
     ).scalar())
 
-    productos_bajo = Producto.query.filter(Producto.stock < Producto.stock_minimo, Producto.stock > 0).order_by(Producto.stock.asc()).all()
-    productos_agotados = Producto.query.filter(Producto.stock == 0).all()
+    productos_bajo = Producto.query.filter(Producto.activo == True, Producto.stock < Producto.stock_minimo, Producto.stock > 0).order_by(Producto.stock.asc()).all()  # noqa: E712
+    productos_agotados = Producto.query.filter(Producto.activo == True, Producto.stock == 0).all()  # noqa: E712
 
     # ── Ventas diarias (últimos 7 días) — solo pagados/entregados ──
     desde_dias = hoy - timedelta(days=6)
     rows_diarios = db.session.query(
-        cast(Venta.fechaventa, Date).label('dia'),
+        expr_fecha(Venta.fechaventa).label('dia'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
-        cast(Venta.fechaventa, Date) >= desde_dias,
+        expr_fecha(Venta.fechaventa) >= desde_dias,
         Venta.estado.in_(estados_pagados)
     ).group_by('dia').order_by('dia').all()
     mapa_dias = {str(r.dia): int(r.total) for r in rows_diarios}
@@ -72,7 +73,7 @@ def dashboard():
         mes_col.label('mes'),
         func.coalesce(func.sum(Venta.precio), 0).label('total')
     ).filter(
-        cast(Venta.fechaventa, Date) >= desde_meses,
+        expr_fecha(Venta.fechaventa) >= desde_meses,
         Venta.estado.in_(estados_pagados)
     ).group_by('mes').order_by('mes').all()
     mapa_meses = {}
@@ -94,7 +95,7 @@ def dashboard():
         .join(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto)
         .join(Venta, Venta.idventa == DetalleVenta.idventa)
         .filter(
-            cast(Venta.fechaventa, Date) >= hoy - timedelta(days=30),
+            expr_fecha(Venta.fechaventa) >= hoy - timedelta(days=30),
             Venta.estado.in_(estados_pagados)
         )
         .group_by(Producto.nombre)
@@ -114,3 +115,4 @@ def dashboard():
                            ventas_mensuales=ventas_mensuales,
                            etiquetas_meses=etiquetas_meses,
                            top_15=top_15)
+

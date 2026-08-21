@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from models import db, Producto, Admin, Reporte
 from blueprints.permisos import requiere_permiso, requiere_ver_pagina
+from utils import ahora_bogota, hoy_bogota
 from . import admin_bp
 
 
@@ -16,7 +17,7 @@ def reportes():
                   .options(db.joinedload(Reporte.prod_rel))
                   .order_by(Reporte.idreporte.desc())
                   .paginate(page=page, per_page=15, error_out=False))
-    productos = Producto.query.order_by(Producto.nombre).all()
+    productos = Producto.query.filter(Producto.activo.is_(True)).order_by(Producto.nombre).all()
     return render_template('admin/reportes.html', reportes=reportes_q, productos=productos)
 
 
@@ -45,7 +46,7 @@ def reporte_crear():
     reporte = Reporte(
         idadmin     = id_creador,
         descripcion = descripcion or None,
-        fecha       = datetime.utcnow(),
+        fecha       = hoy_bogota(),
         producto    = idproducto
     )
     db.session.add(reporte)
@@ -122,7 +123,7 @@ def reportes_excel():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fecha = datetime.now().strftime('%Y-%m-%d')
+    fecha = ahora_bogota().strftime('%Y-%m-%d')
     return send_file(buf, as_attachment=True,
                      download_name=f"reportes_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

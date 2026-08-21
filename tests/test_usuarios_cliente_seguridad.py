@@ -143,10 +143,10 @@ def test_crear_usuario_con_clave_valida_se_acepta(app, client):
 
 def test_registro_con_documento_ajeno_y_nombre_distinto_se_rechaza(client):
     client.post('/cliente/registro', data={
-        'documento': '77001', 'nombre': 'Persona Real', 'ficha': '1000',
+        'documento': '77001', 'nombre': 'Persona Real', 'ficha': '1000', 'autorizo_datos': '1',
     })
     resp = client.post('/cliente/registro', data={
-        'documento': '77001', 'nombre': 'Impostor', 'ficha': '9999',
+        'documento': '77001', 'nombre': 'Impostor', 'ficha': '9999', 'autorizo_datos': '1',
     })
     assert resp.status_code == 200
     assert b'ya est\xc3\xa1 registrado' in resp.data or b'registrado con otro' in resp.data
@@ -154,10 +154,10 @@ def test_registro_con_documento_ajeno_y_nombre_distinto_se_rechaza(client):
 
 def test_registro_con_documento_existente_y_datos_correctos_si_funciona(client):
     client.post('/cliente/registro', data={
-        'documento': '77002', 'nombre': 'Persona Real', 'ficha': '1000',
+        'documento': '77002', 'nombre': 'Persona Real', 'ficha': '1000', 'autorizo_datos': '1',
     })
     resp = client.post('/cliente/registro', data={
-        'documento': '77002', 'nombre': 'Persona Real', 'ficha': '1000',
+        'documento': '77002', 'nombre': 'Persona Real', 'ficha': '1000', 'autorizo_datos': '1',
     }, follow_redirects=True)
     assert resp.status_code == 200
     assert b'Men\xc3\xba' in resp.data or b'catalogo' in resp.request.path.encode() or True

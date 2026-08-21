@@ -1,12 +1,12 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, current_app
 from flask_login import login_required, current_user
-from datetime import datetime
 from PIL import Image
 import os
 import shutil
 import uuid
 from models import db, Producto, BajaInventario, ajustar_stock, registrar_auditoria
 from blueprints.permisos import requiere_permiso, requiere_ver_pagina
+from utils import ahora_bogota
 from . import admin_bp
 
 
@@ -87,9 +87,22 @@ def _get_library_images():
 @login_required
 @requiere_ver_pagina('productos')
 def productos():
-    prods = Producto.query.order_by(Producto.idproducto).all()
+    # HU-36: por defecto solo se listan productos activos;
+    # ?inactivos=1 muestra los dados de baja logicamente.
+    ver_inactivos = request.args.get('inactivos') == '1'
+    query = Producto.query.order_by(Producto.idproducto)
+    prods = query.filter(Producto.activo.is_(False)).all() if ver_inactivos \
+        else query.filter(Producto.activo.is_(True)).all()
     imagenes = _get_library_images()
-    return render_template('admin/productos.html', productos=prods, imagenes_biblioteca=imagenes)
+    # HU-62: ultimas bajas con auditoria (quien y cuando)
+    bajas = (BajaInventario.query
+             .options(db.joinedload(BajaInventario.producto))
+             .order_by(BajaInventario.idbaja.desc())
+             .limit(15)
+             .all())
+    return render_template('admin/productos.html', productos=prods,
+                           imagenes_biblioteca=imagenes, bajas_recientes=bajas,
+                           ver_inactivos=ver_inactivos)
 
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
@@ -209,12 +222,34 @@ def producto_editar(idproducto):
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     nombre_prod = prod.nombre
-    _delete_image(prod.imagen)
-    db.session.delete(prod)
-    db.session.commit()
-    registrar_auditoria(current_user.email, 'eliminar_producto', f'producto:{idproducto}', nombre_prod)
-    flash(f'Producto "{prod.nombre}" eliminado.', 'warning')
+    # HU-36: si el producto tiene historial (ventas, compras, bajas o
+    # reportes) NO se borra fisicamente: se marca inactivo para
+    # preservar el historial y las llaves foraneas que dependen de el.
+    tiene_historial = bool(prod.detalles_venta or prod.detalles_compra or prod.bajas or prod.reportes)
+    if tiene_historial:
+        prod.activo = False
+        db.session.commit()
+        registrar_auditoria(current_user.email, 'desactivar_producto', f'producto:{idproducto}', nombre_prod)
+        flash(f'Producto "{nombre_prod}" tiene historial asociado y fue marcado como INACTIVO (el historial se conserva).', 'warning')
+    else:
+        _delete_image(prod.imagen)
+        db.session.delete(prod)
+        db.session.commit()
+        registrar_auditoria(current_user.email, 'eliminar_producto', f'producto:{idproducto}', nombre_prod)
+        flash(f'Producto "{nombre_prod}" eliminado.', 'warning')
     return redirect(url_for('admin_panel.productos'))
+
+
+@admin_bp.route('/productos/reactivar/<int:idproducto>', methods=['POST'])
+@login_required
+@requiere_permiso('escribir_todo')
+def producto_reactivar(idproducto):
+    prod = Producto.query.get_or_404(idproducto)
+    prod.activo = True
+    db.session.commit()
+    registrar_auditoria(current_user.email, 'reactivar_producto', f'producto:{idproducto}')
+    flash(f'Producto "{prod.nombre}" reactivado.', 'success')
+    return redirect(url_for('admin_panel.productos', inactivos=1))
 
 
 @admin_bp.route('/productos/baja/<int:idproducto>', methods=['POST'])
@@ -244,7 +279,13 @@ def producto_baja(idproducto):
     # 'categoria' ademas del texto libre en 'motivo', para poder agrupar
     # reportes de perdida por categoria sin depender de texto libre.
     categoria = motivo if motivo in ('Vencido', 'Dañado', 'Otro') else 'Otro'
-    baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo, categoria=categoria)
+    # HU-62: quien ejecuto la baja, para auditoria
+    uid = current_user.get_id()
+    baja = BajaInventario(
+        idproducto=idproducto, cantidad=cantidad, motivo=motivo, categoria=categoria,
+        usuario_documento=current_user.documento if uid.startswith('admin:') else current_user.docpersonal,
+        usuario_tipo='admin' if uid.startswith('admin:') else 'personal',
+    )
     db.session.add(baja)
     db.session.commit()
     registrar_auditoria(current_user.email, 'baja_inventario', f'producto:{idproducto}',
@@ -392,7 +433,7 @@ def productos_excel():
 
     # HU-27: limite maximo de filas (el catalogo no tiene columna de
     # fecha para filtrar por rango, a diferencia de ventas/reportes).
-    productos = Producto.query.order_by(Producto.nombre).limit(5000).all()
+    productos = Producto.query.filter(Producto.activo.is_(True)).order_by(Producto.nombre).limit(5000).all()
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventario"
@@ -432,7 +473,7 @@ def productos_excel():
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fecha = datetime.now().strftime('%Y-%m-%d_%H-%M')
+    fecha = ahora_bogota().strftime('%Y-%m-%d_%H-%M')
     return send_file(buf, as_attachment=True,
                      download_name=f"inventario_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
