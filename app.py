@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
@@ -80,6 +81,16 @@ def create_app(config_name='default'):
             session_cookie_secure=True,
         )
 
+        # HU-03: logs con timestamp/nivel/modulo, para poder diagnosticar
+        # incidentes en produccion (antes solo quedaba el print() por
+        # defecto de Flask, sin estructura).
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s %(name)s: %(message)s'
+        ))
+        app.logger.handlers = [handler]
+        app.logger.setLevel(logging.INFO)
+
     from blueprints.cliente   import cliente_bp
     from blueprints.empleados import empleados_bp
     from blueprints.admin     import admin_bp
@@ -98,6 +109,13 @@ def create_app(config_name='default'):
     @app.route('/')
     def index():
         return redirect(url_for('cliente.registro'))
+
+    @app.route('/healthz')
+    def healthz():
+        # HU-03: liveness check simple, sin autenticacion ni datos
+        # sensibles -- no consulta la BD a proposito, solo confirma que
+        # el proceso Flask esta vivo y respondiendo.
+        return {'status': 'ok'}, 200
 
     with app.app_context():
         db.create_all()
