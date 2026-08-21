@@ -6,6 +6,10 @@ __pycache__/
 instance/
 .venv/
 venv/
+.claude/
+server_log.txt
+server.pid
+*.pid
 
 # Imagenes subidas en tiempo de ejecucion (HU-63): no versionar contenido
 # generado en produccion, se persisten en el servidor via volumen.
