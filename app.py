@@ -3,6 +3,8 @@ from datetime import datetime
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
+from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import config, _abrir_tunel, _cerrar_tunel, _construir_db_url
 from models import db, Admin, Personal
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -52,6 +54,29 @@ def create_app(config_name='default'):
     login_manager.login_message = 'Inicia sesión para continuar.'
     login_manager.login_message_category = 'warning'
     login_manager.session_protection = 'strong'
+
+    if config_name == 'production':
+        # El proxy reverso (Coolify) termina el TLS y reenvia por HTTP
+        # interno; sin esto Flask ve toda peticion como no-segura y
+        # Talisman nunca emite Strict-Transport-Security.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+        # HU-19: cabeceras de seguridad HTTP. force_https=False porque el
+        # TLS ya lo termina el proxy reverso (Coolify) delante del
+        # contenedor -- forzarlo aqui podria causar un loop de redirects.
+        Talisman(
+            app,
+            force_https=False,
+            strict_transport_security=True,
+            content_security_policy={
+                'default-src': "'self'",
+                'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+                'style-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+                'img-src': ["'self'", 'data:'],
+                'font-src': ["'self'", 'https://cdn.jsdelivr.net'],
+            },
+            session_cookie_secure=True,
+        )
 
     from blueprints.cliente   import cliente_bp
     from blueprints.empleados import empleados_bp
