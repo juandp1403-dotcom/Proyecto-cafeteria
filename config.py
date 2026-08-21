@@ -87,6 +87,13 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TIMEZONE = 'America/Bogota'
+    # HU-45: si el tunel SSH se cae o hay un timeout de red, sin esto el
+    # pool reutiliza conexiones muertas y falla el primer request tras
+    # un rato de inactividad ("server closed the connection unexpectedly").
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 1800,
+    }
 
 
 class DevelopmentConfig(Config):

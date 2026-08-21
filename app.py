@@ -267,6 +267,22 @@ def _migrar_esquema():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # HU-61: indices en las columnas mas consultadas (dashboard, catalogo,
+    # reportes). CREATE INDEX no bloquea escrituras de forma relevante en
+    # una tabla de este tamaño.
+    for ddl in (
+        "CREATE INDEX IF NOT EXISTS idx_venta_fechaventa ON venta (fechaventa)",
+        "CREATE INDEX IF NOT EXISTS idx_venta_estado ON venta (estado)",
+        "CREATE INDEX IF NOT EXISTS idx_venta_cliente ON venta (cliente)",
+        "CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)",
+        "CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)",
+        "CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)",
+    ):
+        try:
+            db.session.execute(text(ddl))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 def _clave_seed(env_var, default_dev, config_name):
