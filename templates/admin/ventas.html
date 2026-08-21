@@ -7,11 +7,9 @@
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
       <i class="bi bi-graph-up me-2"></i>Historial de Ventas
     </h4>
-    {% if puede('exportar_datos_personales') %}
     <a href="{{ url_for('admin_panel.ventas_excel') }}" class="btn btn-outline-success btn-sm">
       <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel del Día
     </a>
-    {% endif %}
   </div>
 
   <!-- Filtros de período -->

@@ -5,23 +5,21 @@ from flask_login import current_user
 
 PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes', 'auditoria']
 
-# HU-59: 'usuarios' expone datos personales (documento, nombre, correo)
-# de todo el personal -- solo admin y auditor lo necesitan para su rol.
-# 'exportar_datos_personales' separa el permiso de solo-ver-la-pagina
-# del permiso de exportar el detalle completo (ej. Excel de ventas con
-# documento/ficha de cliente); un despachador puede ver la pagina de
-# ventas pero no exportar ese detalle.
+# Nota HU-59: la restriccion de datos personales (enmascarar
+# documento/nombre/ficha por rol) ya la resolvio el equipo en
+# origin/main (commit 0444005, 'ver_datos_personales' + helpers de
+# enmascaramiento) -- no se duplica aqui para no chocar al hacer merge.
+# 'auditoria' es nueva (HU-20, no relacionada con HU-59) y solo la ven
+# admin/auditor.
 PERMISOS = {
     'admin': {
         'ver_todo': True,
         'escribir_todo': True,
-        'exportar_datos_personales': True,
         'paginas': PAGINAS_ADMIN,
     },
     'auditor': {
         'ver_todo': True,
         'escribir_todo': False,
-        'exportar_datos_personales': True,
         'paginas': PAGINAS_ADMIN,
     },
     'cajero': {
@@ -29,14 +27,12 @@ PERMISOS = {
         'escribir_todo': False,
         'aceptar_rechazar_venta': True,
         'generar_reporte': True,
-        'exportar_datos_personales': True,
-        'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'reportes'],
+        'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes'],
     },
     'despachador': {
         'ver_todo': False,
         'ver_solo': ['ventas'],
         'cambiar_estado_entrega': True,
-        'exportar_datos_personales': False,
         'paginas': ['ventas'],
     },
 }
