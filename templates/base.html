@@ -303,6 +303,14 @@
           </a>
         </li>
           {% endif %}
+          {% if puede_ver_pagina('auditoria') %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'admin_panel.auditoria' %}active{% endif %}"
+             href="{{ url_for('admin_panel.auditoria') }}">
+            <i class="bi bi-journal-text me-1"></i>Auditoría
+          </a>
+        </li>
+          {% endif %}
         {% endif %}
         {% endblock %}
       </ul>

@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, request, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import Admin, Personal
+from models import Admin, Personal, registrar_auditoria
 from extensions import limiter
 from . import empleados_bp
 
@@ -37,6 +37,7 @@ def login():
         if not admin and not personal:
             check_password_hash(_HASH_DUMMY, clave)
 
+        registrar_auditoria(email or 'desconocido', 'login_fallido', detalle=f'ip={request.remote_addr}')
         flash('Correo o contraseña incorrectos.', 'danger')
 
     return render_template('empleados/login.html')

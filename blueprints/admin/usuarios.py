@@ -1,6 +1,6 @@
 from flask import render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from models import db, Admin, Personal
+from models import db, Admin, Personal, registrar_auditoria
 from blueprints.permisos import requiere_permiso, requiere_ver_pagina
 from . import admin_bp
 
@@ -65,6 +65,7 @@ def usuario_nuevo():
         p.set_password(clave)
         db.session.add(p)
         db.session.commit()
+        registrar_auditoria(current_user.email, 'crear_usuario', f'personal:{doc_int}', f'rol={rol}')
         flash(f'Personal "{nombre}" creado correctamente.', 'success')
     else:
         if Admin.query.filter_by(email=email).first():
@@ -79,6 +80,7 @@ def usuario_nuevo():
         admin.set_password(clave)
         db.session.add(admin)
         db.session.commit()
+        registrar_auditoria(current_user.email, 'crear_usuario', f'admin:{doc_int}')
         flash(f'Usuario "{nombre}" creado correctamente.', 'success')
 
     return redirect(url_for('admin_panel.usuarios'))
@@ -105,6 +107,7 @@ def usuario_editar(documento):
                 return redirect(url_for('admin_panel.usuarios'))
             p.set_password(nueva_clave)
         db.session.commit()
+        registrar_auditoria(current_user.email, 'editar_usuario', f'personal:{documento}')
         flash('Personal actualizado correctamente.', 'success')
     else:
         admin = Admin.query.get_or_404(documento)
@@ -118,6 +121,7 @@ def usuario_editar(documento):
                 return redirect(url_for('admin_panel.usuarios'))
             admin.set_password(nueva_clave)
         db.session.commit()
+        registrar_auditoria(current_user.email, 'editar_usuario', f'admin:{documento}')
         flash('Usuario actualizado correctamente.', 'success')
 
     return redirect(url_for('admin_panel.usuarios'))
@@ -133,6 +137,7 @@ def usuario_eliminar(documento):
         p = Personal.query.get_or_404(documento)
         db.session.delete(p)
         db.session.commit()
+        registrar_auditoria(current_user.email, 'eliminar_usuario', f'personal:{documento}')
         flash('Personal eliminado.', 'warning')
     else:
         if documento == current_user.documento:
@@ -141,6 +146,7 @@ def usuario_eliminar(documento):
         admin = Admin.query.get_or_404(documento)
         db.session.delete(admin)
         db.session.commit()
+        registrar_auditoria(current_user.email, 'eliminar_usuario', f'admin:{documento}')
         flash('Usuario eliminado.', 'warning')
 
     return redirect(url_for('admin_panel.usuarios'))

@@ -3,7 +3,7 @@ from flask import abort, flash, redirect, url_for, current_app
 from flask_login import current_user
 
 
-PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes']
+PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes', 'auditoria']
 
 # HU-59: 'usuarios' expone datos personales (documento, nombre, correo)
 # de todo el personal -- solo admin y auditor lo necesitan para su rol.

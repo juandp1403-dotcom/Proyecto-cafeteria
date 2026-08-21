@@ -1,11 +1,11 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, current_app
-from flask_login import login_required
+from flask_login import login_required, current_user
 from datetime import datetime
 from PIL import Image
 import os
 import shutil
 import uuid
-from models import db, Producto, BajaInventario, ajustar_stock
+from models import db, Producto, BajaInventario, ajustar_stock, registrar_auditoria
 from blueprints.permisos import requiere_permiso, requiere_ver_pagina
 from . import admin_bp
 
@@ -144,6 +144,8 @@ def producto_nuevo():
                     stock_minimo=stock_minimo, costo=costo, es_especial=es_especial)
     db.session.add(prod)
     db.session.commit()
+    registrar_auditoria(current_user.email, 'crear_producto', f'producto:{prod.idproducto}',
+                         f'precio={precio}, costo={costo}')
     flash(f'Producto "{nombre}" creado correctamente.', 'success')
     return redirect(url_for('admin_panel.productos'))
 
@@ -153,6 +155,7 @@ def producto_nuevo():
 @requiere_permiso('escribir_todo')
 def producto_editar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
+    precio_anterior = prod.precio
     prod.nombre = request.form.get('nombre', prod.nombre).strip()
     try:
         nuevo_precio = int(request.form.get('precio', prod.precio))
@@ -194,6 +197,8 @@ def producto_editar(idproducto):
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
                 prod.imagen = lib_image
     db.session.commit()
+    detalle = f'precio {precio_anterior}->{nuevo_precio}' if precio_anterior != nuevo_precio else None
+    registrar_auditoria(current_user.email, 'editar_producto', f'producto:{idproducto}', detalle)
     flash(f'Producto "{prod.nombre}" actualizado.', 'success')
     return redirect(url_for('admin_panel.productos'))
 
@@ -203,9 +208,11 @@ def producto_editar(idproducto):
 @requiere_permiso('escribir_todo')
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
+    nombre_prod = prod.nombre
     _delete_image(prod.imagen)
     db.session.delete(prod)
     db.session.commit()
+    registrar_auditoria(current_user.email, 'eliminar_producto', f'producto:{idproducto}', nombre_prod)
     flash(f'Producto "{prod.nombre}" eliminado.', 'warning')
     return redirect(url_for('admin_panel.productos'))
 
@@ -240,6 +247,8 @@ def producto_baja(idproducto):
     baja = BajaInventario(idproducto=idproducto, cantidad=cantidad, motivo=motivo, categoria=categoria)
     db.session.add(baja)
     db.session.commit()
+    registrar_auditoria(current_user.email, 'baja_inventario', f'producto:{idproducto}',
+                         f'cantidad={cantidad}, motivo={motivo}')
 
     flash(f'Se han dado de baja {cantidad} unidades de "{prod.nombre}" por motivo: {motivo}.', 'success')
     return redirect(url_for('admin_panel.productos'))
