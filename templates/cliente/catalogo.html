@@ -65,9 +65,11 @@
         {% endif %}
         <div class="producto-emoji mb-2 mt-2">
           {% if p.imagen %}
-            <img src="{{ url_for('static', filename='productos/' + p.imagen) }}" 
-                 alt="{{ p.nombre }}" class="rounded"
-                 style="width:64px;height:64px;object-fit:cover;">
+            <img src="{{ url_for('static', filename='productos/' + p.imagen) }}"
+                 alt="{{ p.nombre }}" class="rounded" width="64" height="64"
+                 style="width:64px;height:64px;object-fit:cover;display:inline-block;overflow:hidden;"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+            <span style="display:none">🍽️</span>
           {% else %}
             🍽️
           {% endif %}
