@@ -218,6 +218,21 @@ def estado_pedido(idventa):
     return render_template('cliente/estado_pedido.html', venta=venta)
 
 
+@cliente_bp.route('/estado/<int:idventa>/json')
+@limiter.limit("20 per minute")
+def estado_pedido_json(idventa):
+    """HU-26: endpoint liviano para el polling de la pantalla de estado
+    -- solo el estado, sin recargar toda la pagina. Mismo control de
+    acceso que la vista HTML; limite de frecuencia para que el polling
+    del navegador no pueda usarse para golpear el servidor."""
+    venta = Venta.query.get_or_404(idventa)
+    es_propietario = 'cliente_doc' in session and session['cliente_doc'] == venta.cliente
+    es_admin = current_user.is_authenticated
+    if not es_propietario and not es_admin:
+        return jsonify({'error': 'sin acceso'}), 403
+    return jsonify({'estado': venta.estado})
+
+
 @cliente_bp.route('/cancelar/<int:idventa>', methods=['POST'])
 def cancelar_pedido(idventa):
     """HU-29: el cliente puede cancelar su propio pedido mientras siga

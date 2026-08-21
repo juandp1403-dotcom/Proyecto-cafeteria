@@ -24,19 +24,18 @@
         Total: ${{ "{:,}".format(venta.precio) }}
       </div>
 
-      <div class="alert alert-info py-2">
-        <i class="bi bi-hourglass-split me-2"></i>Pedido recibido — acércate a la ventanilla
+      <div id="estado-alert" class="alert alert-info py-2">
+        <i class="bi bi-hourglass-split me-2"></i><span id="estado-texto">Pedido recibido — acércate a la ventanilla</span>
       </div>
 
-      {% if session.get('cliente_doc') == venta.cliente and venta.estado == 'Pendiente de Pago' %}
-      <form method="POST" action="{{ url_for('cliente.cancelar_pedido', idventa=venta.idventa) }}"
-            onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?')" class="mb-2">
+      <form id="form-cancelar" method="POST" action="{{ url_for('cliente.cancelar_pedido', idventa=venta.idventa) }}"
+            onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?')" class="mb-2"
+            {% if not (session.get('cliente_doc') == venta.cliente and venta.estado == 'Pendiente de Pago') %}style="display:none"{% endif %}>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <button type="submit" class="btn btn-outline-danger w-100">
           <i class="bi bi-x-circle me-1"></i>Cancelar pedido
         </button>
       </form>
-      {% endif %}
 
       <a href="{{ url_for('cliente.catalogo') }}" class="btn btn-sena w-100 mt-2">
         <i class="bi bi-arrow-left me-1"></i>Volver al menú
@@ -44,4 +43,52 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// HU-26: polling de bajo costo -- consulta el estado cada 8s (limite
+// razonable, no cada segundo) y actualiza la pantalla sin recargar.
+// Se detiene solo al llegar a un estado final (Entregado/Cancelado).
+(function () {
+  const ES_PROPIETARIO = {{ 'true' if session.get('cliente_doc') == venta.cliente else 'false' }};
+  const IDVENTA = {{ venta.idventa }};
+  const MENSAJES = {
+    'Pendiente de Pago': ['alert-info', 'bi-hourglass-split', 'Pedido recibido — acércate a la ventanilla'],
+    'Pagado/Preparando': ['alert-primary', 'bi-cup-hot', 'Tu pedido está en preparación'],
+    'Preparado':         ['alert-warning', 'bi-bag-check', 'Tu pedido está listo — acércate a recogerlo'],
+    'Entregado':         ['alert-success', 'bi-check-circle', 'Pedido entregado. ¡Gracias!'],
+    'Cancelado':         ['alert-secondary', 'bi-x-circle', 'Este pedido fue cancelado'],
+  };
+  const ESTADOS_FINALES = ['Entregado', 'Cancelado'];
+  let estadoActual = {{ venta.estado|tojson }};
+
+  function pintarEstado(estado) {
+    const [clase, icono, texto] = MENSAJES[estado] || ['alert-info', 'bi-info-circle', estado];
+    const caja = document.getElementById('estado-alert');
+    caja.className = 'alert py-2 ' + clase;
+    caja.innerHTML = '<i class="bi ' + icono + ' me-2"></i><span id="estado-texto">' + texto + '</span>';
+    const formCancelar = document.getElementById('form-cancelar');
+    if (formCancelar) {
+      formCancelar.style.display = (ES_PROPIETARIO && estado === 'Pendiente de Pago') ? '' : 'none';
+    }
+  }
+
+  function consultarEstado() {
+    fetch('/cliente/estado/' + IDVENTA + '/json')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.estado === estadoActual) return;
+        estadoActual = data.estado;
+        pintarEstado(estadoActual);
+        if (ESTADOS_FINALES.includes(estadoActual)) {
+          clearInterval(intervalo);
+        }
+      })
+      .catch(() => {});
+  }
+
+  const intervalo = setInterval(consultarEstado, 8000);
+})();
+</script>
 {% endblock %}
