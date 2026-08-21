@@ -1,0 +1,61 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Auditoría – Admin Cafetería{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
+      <i class="bi bi-journal-text me-2"></i>Registro de Auditoría
+    </h4>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover table-sena align-middle">
+      <thead>
+        <tr>
+          <th>Fecha/Hora (UTC)</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registros.items %}
+        <tr>
+          <td class="text-muted small">{{ r.timestamp.strftime('%d/%m/%Y %H:%M:%S') if r.timestamp else '' }}</td>
+          <td class="fw-semibold">{{ r.usuario }}</td>
+          <td><span class="badge bg-secondary">{{ r.accion }}</span></td>
+          <td>{{ r.entidad or '-' }}</td>
+          <td class="text-muted small">{{ r.detalle or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Sin eventos registrados todavía.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if registros.pages > 1 %}
+  <nav class="mt-3">
+    <ul class="pagination justify-content-center">
+      {% if registros.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ registros.prev_num }}">&laquo;</a>
+        </li>
+      {% endif %}
+      {% for page in registros.iter_pages() %}
+        {% if page %}
+          <li class="page-item {% if page == registros.page %}active{% endif %}">
+            <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+        {% endif %}
+      {% endfor %}
+      {% if registros.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ registros.next_num }}">&raquo;</a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

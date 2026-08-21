@@ -3,21 +3,31 @@ from flask import abort, current_app
 from flask_login import current_user
 
 
+PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes', 'auditoria']
+
+# HU-59, combinado: el equipo (Juanes, commit 0444005) resolvio el
+# enmascarado de datos personales ('ver_datos_personales' + helpers
+# iniciales()/doc_enmascarado()). A eso le faltaba el otro criterio de
+# aceptacion de la historia original: "un cajero ya no puede ABRIR la
+# gestion de usuarios del personal" -- por eso 'usuarios' se quita de
+# las paginas de cajero, mientras que auditor (que necesita ver el
+# listado, solo que sin datos completos) la conserva enmascarada.
+# 'auditoria' es HU-20, sin relacion con HU-59, solo para admin/auditor.
 PERMISOS = {
     'admin': {
         'ver_todo': True,
         'escribir_todo': True,
-        # El admin es superusuario: puede ejecutar todas las acciones
         'aceptar_rechazar_venta': True,
         'cambiar_estado_entrega': True,
         'generar_reporte': True,
-        # HU-59: ver documento/nombre/ficha/correo completos de clientes y personal
         'ver_datos_personales': True,
+        'paginas': PAGINAS_ADMIN,
     },
     'auditor': {
         'ver_todo': True,
         'escribir_todo': False,
         'ver_datos_personales': False,
+        'paginas': PAGINAS_ADMIN,
     },
     'cajero': {
         'ver_todo': True,
@@ -25,16 +35,16 @@ PERMISOS = {
         'aceptar_rechazar_venta': True,
         'generar_reporte': True,
         'ver_datos_personales': False,
+        'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'reportes'],
     },
     'despachador': {
         'ver_todo': False,
         'ver_solo': ['ventas'],
         'cambiar_estado_entrega': True,
         'ver_datos_personales': False,
+        'paginas': ['ventas'],
     },
 }
-
-PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes']
 
 
 def tipo_usuario_actual():
@@ -42,7 +52,7 @@ def tipo_usuario_actual():
         return None
     rid = current_user.get_id()
     if rid.startswith('admin:'):
-        return 'admin'
+        return getattr(current_user, 'rol', None) or 'admin'
     if rid.startswith('personal:'):
         return getattr(current_user, 'rol', None)
     return None
@@ -52,6 +62,8 @@ def puede(permiso):
     rol = tipo_usuario_actual()
     if rol is None:
         return False
+    if rol == 'admin':
+        return True
     permisos_rol = PERMISOS.get(rol, {})
     return permisos_rol.get(permiso, False)
 
@@ -60,11 +72,7 @@ def puede_ver_pagina(nombre_pagina):
     rol = tipo_usuario_actual()
     if rol is None:
         return False
-    if rol in ('admin', 'auditor', 'cajero'):
-        return True
-    if rol == 'despachador':
-        return nombre_pagina in PERMISOS['despachador'].get('ver_solo', [])
-    return False
+    return nombre_pagina in PERMISOS.get(rol, {}).get('paginas', [])
 
 
 def requiere_permiso(permiso):

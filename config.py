@@ -1,4 +1,6 @@
 import os
+import paramiko
+from datetime import timedelta
 from dotenv import load_dotenv
 from sshtunnel import SSHTunnelForwarder
 
@@ -7,7 +9,27 @@ load_dotenv()
 _tunnel = None
 
 
-def _abrir_tunel():
+def _cargar_ssh_host_key(ssh_host):
+    """Carga la clave de host SSH esperada desde SSH_HOST_KEY, en formato
+    known_hosts ('tipo base64key', ej. 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5...').
+    Se obtiene una vez con: ssh-keyscan -t ed25519 <host>
+
+    Sin esto, SSHTunnelForwarder acepta CUALQUIER clave de host que
+    presente el servidor remoto (riesgo de intercepcion MITM del trafico
+    hacia la base de datos) — HU-43."""
+    linea = os.environ.get('SSH_HOST_KEY')
+    if not linea:
+        return None
+    entry = paramiko.hostkeys.HostKeyEntry.from_line(f"{ssh_host} {linea.strip()}")
+    if entry is None:
+        raise RuntimeError(
+            "SSH_HOST_KEY tiene un formato invalido. Se espera 'tipo base64key', "
+            "ej: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...'"
+        )
+    return entry.key
+
+
+def _abrir_tunel(config_name='development'):
     """Abre un tunel SSH al servidor remoto y retorna el puerto local."""
     global _tunnel
     if _tunnel is not None:
@@ -17,10 +39,23 @@ def _abrir_tunel():
     if not ssh_host:
         return None
 
+    host_key = _cargar_ssh_host_key(ssh_host)
+    if host_key is None:
+        mensaje = (
+            f"SSH_HOST_KEY no esta configurada. Sin ella el tunel acepta "
+            f"cualquier clave de host de '{ssh_host}' (riesgo de MITM). "
+            f"Obtenla con: ssh-keyscan -t ed25519 {ssh_host}  y configura "
+            f"SSH_HOST_KEY='ssh-ed25519 AAAA...' en el entorno."
+        )
+        if config_name == 'production':
+            raise RuntimeError(mensaje)
+        print(f"[tunel SSH] ADVERTENCIA: {mensaje}")
+
     _tunnel = SSHTunnelForwarder(
         (ssh_host, int(os.environ.get('SSH_PORT', '22'))),
         ssh_username=os.environ.get('SSH_USER', 'root'),
         ssh_pkey=os.environ.get('SSH_KEY'),
+        ssh_host_key=host_key,
         remote_bind_address=(
             os.environ.get('DB_HOST', '127.0.0.1'),
             int(os.environ.get('DB_PORT', '5432'))
@@ -39,7 +74,7 @@ def _cerrar_tunel():
 
 
 def _construir_db_url(puerto_local):
-    user = os.environ.get('DB_USER', 'juan')
+    user = os.environ.get('DB_USER', 'postgres')
     password = os.environ.get('DB_PASS', '')
     name = os.environ.get('DB_NAME', 'cafeteria')
     if password:
@@ -52,6 +87,13 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TIMEZONE = 'America/Bogota'
+    # HU-45: si el tunel SSH se cae o hay un timeout de red, sin esto el
+    # pool reutiliza conexiones muertas y falla el primer request tras
+    # un rato de inactividad ("server closed the connection unexpectedly").
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 1800,
+    }
 
 
 class DevelopmentConfig(Config):
@@ -60,6 +102,9 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
 
 config = {

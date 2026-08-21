@@ -1,0 +1,44 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Importar Productos – Admin{% endblock %}
+
+{% block admin_content %}
+<div class="container-fluid py-3" style="max-width:700px">
+  <h4 class="fw-bold mb-3" style="color:var(--sena-green)">
+    <i class="bi bi-file-earmark-excel me-2"></i>Importar Productos desde Excel
+  </h4>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="text-muted small">
+        El archivo debe ser <code>.xlsx</code> con encabezados en la primera fila.
+        Columnas reconocidas (el orden no importa, mayúsculas/minúsculas no importan):
+      </p>
+      <ul class="small text-muted">
+        <li><strong>nombre</strong> (obligatoria)</li>
+        <li><strong>precio</strong> (obligatoria)</li>
+        <li><strong>costo</strong> (opcional, por defecto 0)</li>
+        <li><strong>stock</strong> (opcional, por defecto 0)</li>
+        <li><strong>stock_minimo</strong> (opcional, por defecto 10)</li>
+      </ul>
+      <p class="small text-muted">
+        Si el <strong>nombre</strong> ya existe en el catálogo (sin importar mayúsculas),
+        ese producto se <strong>actualiza</strong>. Si no existe, se <strong>crea</strong>.
+      </p>
+
+      <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="archivoExcel">Archivo Excel (.xlsx)</label>
+          <input type="file" class="form-control" id="archivoExcel" name="archivo" accept=".xlsx" required>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('admin_panel.productos') }}" class="btn btn-outline-secondary">Cancelar</a>
+          <button type="submit" class="btn btn-sena">
+            <i class="bi bi-upload me-1"></i>Importar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

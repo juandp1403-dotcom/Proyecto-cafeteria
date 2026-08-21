@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Recuperar contraseña – Cafetería SENA{% endblock %}
+
+{% block body %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
+  <div class="card" style="width:100%;max-width:400px">
+    <div class="card-header-sena text-center">
+      <h5 class="mb-0"><i class="bi bi-key me-2"></i>Recuperar contraseña</h5>
+      <small class="opacity-75">Cafetería CGAO – Admin y Empleados</small>
+    </div>
+    <div class="card-body p-4">
+      <p class="text-muted small mb-3">
+        Escribe tu correo. Si está registrado, te enviaremos un enlace
+        para restablecer tu contraseña, válido por 30 minutos.
+      </p>
+      <form method="POST" action="{{ url_for('empleados.olvide_clave') }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="email">Correo electrónico</label>
+          <input type="email" id="email" class="form-control" name="email" required autofocus
+                 placeholder="tu@correo.com">
+        </div>
+        <button type="submit" class="btn btn-sena w-100">
+          <i class="bi bi-envelope-paper me-2"></i>Enviar enlace
+        </button>
+      </form>
+      <div class="text-center mt-3">
+        <a href="{{ url_for('empleados.login') }}" class="text-muted small">
+          <i class="bi bi-arrow-left me-1"></i>Volver al inicio de sesión
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

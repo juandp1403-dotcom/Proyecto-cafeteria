@@ -1,12 +1,15 @@
-from flask import render_template, request, redirect, url_for, session, jsonify, flash
+from flask import render_template, request, redirect, url_for, session, jsonify, flash, current_app
 from flask_login import current_user
-from models import db, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
-from utils import ahora_bogota
+from sqlalchemy import func
+from models import db, expr_fecha, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
+from extensions import limiter
+from utils import ahora_bogota, hoy_bogota
 from . import cliente_bp
 
 
 @cliente_bp.route('/', methods=['GET', 'POST'])
 @cliente_bp.route('/registro', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=['POST'])
 def registro():
     if request.method == 'POST':
         doc    = request.form.get('documento', '').strip()
@@ -23,19 +26,35 @@ def registro():
                 'cliente/registro.html',
                 error='Debes autorizar el tratamiento de tus datos personales conforme a la Ley 1581 de 2012 para continuar.')
 
+        # Las columnas son db.Integer (32 bits en PostgreSQL); un numero
+        # fuera de ese rango no es un documento/ficha valido y antes
+        # llegaba sin validar hasta el driver de BD, donde SQLite lo
+        # rechazaba con un OverflowError sin manejar (500).
         try:
             doc   = int(doc)
             ficha = int(ficha)
+            if not (0 < doc <= 2_147_483_647) or not (0 < ficha <= 2_147_483_647):
+                raise ValueError
         except ValueError:
-            return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos.')
+            return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos válidos.')
 
+        # HU-08: si el documento ya existe, exigir que nombre y ficha
+        # coincidan exactamente con lo guardado antes de reutilizar esa
+        # identidad -- antes cualquiera que conociera un documento ajeno
+        # podia sobrescribir el nombre y ver el historial de esa persona.
         cliente = Cliente.query.get(doc)
         if not cliente:
             cliente = Cliente(documento=doc, nombre=nombre, ficha=ficha)
             db.session.add(cliente)
-        else:
-            cliente.nombre = nombre
-            cliente.ficha  = ficha
+        elif cliente.nombre.strip().lower() != nombre.strip().lower() or cliente.ficha != ficha:
+            current_app.logger.warning(
+                'Intento de registro con documento existente sin coincidencia: documento=%s', doc
+            )
+            return render_template('cliente/registro.html', error=(
+                'Ese documento ya está registrado con otro nombre o ficha. '
+                'Verifica que los escribiste exactamente igual a tu primer registro, '
+                'o pide ayuda a un cajero.'
+            ))
         db.session.commit()
 
         session['cliente_doc']    = doc
@@ -110,17 +129,29 @@ def confirmar():
     if not items:
         return jsonify({'error': 'Carrito vacio'}), 400
 
-    total = 0
-    detalles_a_guardar = []
+    # HU-49: limitar cuantos items distintos puede traer un pedido, y
+    # consolidar cantidades repetidas del mismo producto ANTES de
+    # validar el tope de 100 -- antes se podia evadir ese tope
+    # repitiendo el mismo producto en varias filas del carrito.
+    if len(items) > 50:
+        return jsonify({'error': 'El pedido tiene demasiados items distintos (maximo 50)'}), 400
 
+    cantidades_por_producto = {}
     for item in items:
         try:
             idproducto = int(item['idproducto'])
             cantidad = int(item['cantidad'])
         except (ValueError, TypeError, KeyError):
             return jsonify({'error': 'Datos de producto invalidos'}), 400
+        if cantidad <= 0:
+            return jsonify({'error': f'Cantidad invalida para el producto {idproducto}'}), 400
+        cantidades_por_producto[idproducto] = cantidades_por_producto.get(idproducto, 0) + cantidad
 
-        if cantidad <= 0 or cantidad > 100:
+    total = 0
+    detalles_a_guardar = []
+
+    for idproducto, cantidad in cantidades_por_producto.items():
+        if cantidad > 100:
             return jsonify({'error': f'Cantidad invalida para el producto {idproducto} (debe ser entre 1 y 100)'}), 400
 
         prod = Producto.query.get(idproducto)
@@ -140,10 +171,30 @@ def confirmar():
             db.session.rollback()
             return jsonify({'error': f'Stock insuficiente para {prod.nombre}'}), 400
 
+    # HU-76: metodo de pago opcional, necesario para el futuro cierre
+    # de caja (HU-75) y para que los reportes reflejen como entra el
+    # dinero real, no solo el total.
+    metodos_validos = {'Efectivo', 'Tarjeta', 'Transferencia'}
+    metodo_pago = data.get('metodo_pago')
+    if metodo_pago not in metodos_validos:
+        metodo_pago = 'Efectivo'
+
+    # HU-57: numero de pedido consecutivo del dia, calculado y guardado
+    # una sola vez al crear la venta (no como propiedad recalculada en
+    # cada lectura). No es perfectamente a prueba de condiciones de
+    # carrera bajo concurrencia muy alta, pero es la misma fuente para
+    # cliente y cajero -- ya no hay tres numeraciones que no coinciden.
+    hoy = hoy_bogota()
+    ultimo_numero = (db.session.query(func.coalesce(func.max(Venta.numero_pedido_diario), 0))
+                      .filter(expr_fecha(Venta.fechaventa) == hoy)
+                      .scalar())
+
     venta = Venta(
-        precio     = total,
-        cliente    = session['cliente_doc'],
-        fechaventa = ahora_bogota(),
+        precio      = total,
+        cliente     = session['cliente_doc'],
+        fechaventa  = ahora_bogota(),
+        metodo_pago = metodo_pago,
+        numero_pedido_diario = ultimo_numero + 1,
     )
     db.session.add(venta)
     db.session.flush()
@@ -178,6 +229,51 @@ def estado_pedido(idventa):
         flash('No tienes acceso a este pedido.', 'danger')
         return redirect(url_for('cliente.registro'))
     return render_template('cliente/estado_pedido.html', venta=venta)
+
+
+@cliente_bp.route('/estado/<int:idventa>/json')
+@limiter.limit("20 per minute")
+def estado_pedido_json(idventa):
+    """HU-26: endpoint liviano para el polling de la pantalla de estado
+    -- solo el estado, sin recargar toda la pagina. Mismo control de
+    acceso que la vista HTML; limite de frecuencia para que el polling
+    del navegador no pueda usarse para golpear el servidor."""
+    venta = Venta.query.get_or_404(idventa)
+    es_propietario = 'cliente_doc' in session and session['cliente_doc'] == venta.cliente
+    es_admin = current_user.is_authenticated
+    if not es_propietario and not es_admin:
+        return jsonify({'error': 'sin acceso'}), 403
+    return jsonify({'estado': venta.estado})
+
+
+@cliente_bp.route('/cancelar/<int:idventa>', methods=['POST'])
+def cancelar_pedido(idventa):
+    """HU-29: el cliente puede cancelar su propio pedido mientras siga
+    en 'Pendiente de Pago', devolviendo el stock igual que cuando lo
+    rechaza un cajero."""
+    venta = Venta.query.get_or_404(idventa)
+    if 'cliente_doc' not in session or session['cliente_doc'] != venta.cliente:
+        flash('No tienes acceso a este pedido.', 'danger')
+        return redirect(url_for('cliente.registro'))
+
+    detalles = list(venta.detalles)
+    # UPDATE condicionado al estado actual (mismo patron que HU-48 en
+    # admin/ventas.py), para que un doble clic no devuelva el stock dos veces.
+    afectados = Venta.query.filter(
+        Venta.idventa == idventa, Venta.estado == 'Pendiente de Pago'
+    ).update({'estado': 'Cancelado'}, synchronize_session=False)
+    db.session.commit()
+
+    if afectados:
+        from models import ajustar_stock
+        for det in detalles:
+            ajustar_stock(det.idproducto, det.cantidad)
+        db.session.commit()
+        flash('Tu pedido fue cancelado.', 'success')
+    else:
+        flash('Este pedido ya no se puede cancelar (ya fue procesado).', 'warning')
+
+    return redirect(url_for('cliente.estado_pedido', idventa=idventa))
 
 
 @cliente_bp.route('/salir')

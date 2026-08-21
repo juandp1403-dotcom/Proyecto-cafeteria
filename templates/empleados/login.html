@@ -31,14 +31,14 @@
       <form method="POST" action="{{ url_for('empleados.login') }}" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
-          <label class="form-label fw-semibold">
+          <label class="form-label fw-semibold" for="login-email">
             <i class="bi bi-envelope me-1" style="color:var(--sena-green)"></i>Correo electrónico
           </label>
-          <input type="email" class="form-control" name="email" required autofocus
+          <input type="email" id="login-email" class="form-control" name="email" required autofocus
                  placeholder="tu@correo.com">
         </div>
         <div class="mb-4">
-          <label class="form-label fw-semibold">
+          <label class="form-label fw-semibold" for="campoPass">
             <i class="bi bi-key me-1" style="color:var(--sena-green)"></i>Contraseña
           </label>
           <div class="input-group">
@@ -53,6 +53,11 @@
         </button>
       </form>
 
+      <div class="text-center mt-2">
+        <a href="{{ url_for('empleados.olvide_clave') }}" class="text-muted small">
+          <i class="bi bi-key me-1"></i>¿Olvidaste tu contraseña?
+        </a>
+      </div>
       <div class="text-center mt-3">
         <a href="{{ url_for('cliente.registro') }}" class="text-muted small">
           <i class="bi bi-arrow-left me-1"></i>Volver al registro de cliente

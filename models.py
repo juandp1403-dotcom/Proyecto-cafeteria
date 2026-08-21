@@ -1,3 +1,5 @@
+import secrets
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -27,6 +29,11 @@ class Producto(db.Model):
     imagen       = db.Column(db.String(255), nullable=True, default=None)
     stock_minimo = db.Column(db.Integer, nullable=False, default=10)
     costo        = db.Column(db.Integer, nullable=False, default=0)
+    # HU-68: destacar un producto como especial/promocion del dia en el
+    # catalogo. especial_hasta es opcional -- si se pone, la promocion
+    # se considera vencida despues de esa fecha (logica en el codigo).
+    es_especial     = db.Column(db.Boolean, nullable=False, default=False)
+    especial_hasta  = db.Column(db.Date, nullable=True)
     # HU-62: auditoria (quien/cuando se creo y modifico por ultima vez)
     created_at   = db.Column(db.DateTime, default=ahora_bogota)
     updated_at   = db.Column(db.DateTime, default=ahora_bogota, onupdate=ahora_bogota)
@@ -60,6 +67,19 @@ class Producto(db.Model):
             'costo':        self.costo,
         }
 
+
+def ajustar_stock(idproducto, delta):
+    """Ajusta el stock de un producto con un UPDATE condicional atomico,
+    para que dos operaciones concurrentes (venta, baja, rechazo, compra)
+    no se pisen entre si. Si delta es negativo, exige que el stock
+    resultante no quede negativo. Devuelve True si se aplico el ajuste,
+    False si no habia stock suficiente (delta negativo)."""
+    query = Producto.query.filter(Producto.idproducto == idproducto)
+    if delta < 0:
+        query = query.filter(Producto.stock >= -delta)
+    afectados = query.update({'stock': Producto.stock + delta})
+    return afectados > 0
+
 class Cliente(db.Model):
     __tablename__ = 'cliente'
     documento = db.Column(db.Integer, primary_key=True)
@@ -76,6 +96,18 @@ class Venta(db.Model):
     # HU-56: fecha Y hora reales en zona America/Bogota
     fechaventa = db.Column(db.DateTime, default=ahora_bogota)
     estado     = db.Column(db.String(30), nullable=False, default='Pendiente de Pago')
+    # HU-76: como se pago la venta -- necesario para el cierre de caja
+    # (HU-75, pendiente) y para que los reportes reflejen la realidad
+    # de como entra el dinero, no solo el total.
+    metodo_pago = db.Column(db.String(20), nullable=True)
+    # HU-57: numero de pedido consecutivo DENTRO DEL DIA, persistido al
+    # crear la venta (antes existian tres numeraciones distintas que no
+    # coincidian entre si: el id global en la factura del cliente, un
+    # indice de paginacion en la lista del cajero, y esta misma logica
+    # pero calculada de nuevo en cada lectura via COUNT -- ahora es una
+    # sola fuente, escrita una vez). NO reintroducir como @property: ya
+    # se probo ese enfoque y hacia una consulta N+1 por venta.
+    numero_pedido_diario = db.Column(db.Integer, nullable=True)
     # HU-62: auditoria
     created_at = db.Column(db.DateTime, default=ahora_bogota)
     updated_at = db.Column(db.DateTime, default=ahora_bogota, onupdate=ahora_bogota)
@@ -83,30 +115,10 @@ class Venta(db.Model):
     cliente_rel = db.relationship('Cliente',      back_populates='ventas')
     detalles    = db.relationship('DetalleVenta', back_populates='venta', cascade='all, delete-orphan')
 
-    @property
-    def numero_pedido_diario(self):
-        """Número secuencial de pedido dentro del mismo día."""
-        fecha = (self.fechaventa.date() if self.fechaventa else hoy_bogota())
-        if self.idventa:
-            num = (db.session.query(func.count(Venta.idventa))
-                   .filter(expr_fecha(Venta.fechaventa) == fecha, Venta.idventa <= self.idventa)
-                   .scalar())
-        else:
-            num = 0
-        return num
-
-    def to_dict(self):
-        return {
-            'idventa':            self.idventa,
-            'numero_pedido_diario': self.numero_pedido_diario,
-            'precio':             self.precio,
-            'cliente':            self.cliente,
-            'nombre_cliente':     self.cliente_rel.nombre if self.cliente_rel else '',
-            'ficha_cliente':      self.cliente_rel.ficha  if self.cliente_rel else '',
-            'fechaventa':         self.fechaventa.strftime('%d/%m/%Y') if self.fechaventa else '',
-            'estado':             self.estado,
-            'detalles':           [d.to_dict() for d in self.detalles]
-        }
+    # HU-22: to_dict() nunca se usa en ningun lado del codigo (verificado
+    # por grep) y dependia de numero_pedido_diario, que hace una consulta
+    # N+1 por venta -- se elimina en vez de dejarlo como codigo muerto
+    # con una trampa de rendimiento.
 
 class DetalleVenta(db.Model):
     __tablename__ = 'detalleventa'
@@ -165,7 +177,7 @@ class Personal(UserMixin, db.Model):
     docpersonal = db.Column(db.Integer, primary_key=True)
     nombre      = db.Column(db.String(50))
     clave       = db.Column(db.String(255))
-    email       = db.Column(db.String(30))
+    email       = db.Column(db.String(120))
     rol         = db.Column(db.String(15))
     # HU-36: desactivacion en lugar de borrado cuando tiene historial
     activo      = db.Column(db.Boolean, nullable=False, default=True)
@@ -224,6 +236,9 @@ class BajaInventario(db.Model):
     idproducto = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
     cantidad   = db.Column(db.Integer, nullable=False)
     motivo     = db.Column(db.String(255), nullable=False)
+    # HU-71: categoria estructurada, separada del texto libre de motivo,
+    # para poder agrupar cuanto se pierde por vencimiento vs. dano vs. otro.
+    categoria  = db.Column(db.String(20), nullable=False, default='Otro')
     fecha      = db.Column(db.Date, default=hoy_bogota)
     # HU-62: quien ejecuto la baja (Admin o Personal; sin FK por ser tablas distintas)
     usuario_documento = db.Column(db.Integer, nullable=True)
@@ -268,12 +283,15 @@ class SolicitudSupresion(db.Model):
 class Reporte(db.Model):
     __tablename__ = 'reporte'
     idreporte   = db.Column(db.Integer, primary_key=True)
-    idadmin     = db.Column(db.Integer, nullable=False)
+    idadmin     = db.Column(db.Integer, db.ForeignKey('admin.documento'), nullable=False)
     descripcion = db.Column(db.String(255), nullable=True)
     fecha       = db.Column(db.Date, nullable=True, default=hoy_bogota)
     producto    = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
 
     prod_rel  = db.relationship('Producto', backref='reportes')
+    # HU-22: to_dict() referenciaba self.admin_rel sin que existiera la
+    # relacion (AttributeError garantizado si alguna vez se llamaba).
+    admin_rel = db.relationship('Admin', backref='reportes_creados')
 
     def to_dict(self):
         return {
@@ -285,3 +303,84 @@ class Reporte(db.Model):
             'idproducto':      self.producto,
             'nombre_producto': self.prod_rel.nombre if self.prod_rel else '',
         }
+
+
+class RegistroAuditoria(db.Model):
+    """HU-20: quien hizo que y cuando, para acciones sensibles (login
+    fallido, creacion/edicion/borrado de usuarios y productos, cambios
+    de precio, bajas de inventario). Se guarda usuario+entidad como
+    texto (no FK) a proposito: la fila de auditoria debe sobrevivir
+    aunque la cuenta o el producto involucrado se borren despues."""
+    __tablename__ = 'registroauditoria'
+    idregistro = db.Column(db.Integer, primary_key=True)
+    usuario    = db.Column(db.String(150), nullable=False)
+    accion     = db.Column(db.String(50), nullable=False)
+    entidad    = db.Column(db.String(150), nullable=True)
+    detalle    = db.Column(db.String(500), nullable=True)
+    timestamp  = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+def registrar_auditoria(usuario, accion, entidad=None, detalle=None):
+    """Registra un evento de auditoria. Nunca lanza una excepcion hacia
+    el llamador: un fallo al escribir el log de auditoria no debe
+    tumbar la operacion real (crear un usuario, aceptar una venta)."""
+    try:
+        db.session.add(RegistroAuditoria(
+            usuario=usuario or 'desconocido',
+            accion=accion,
+            entidad=entidad,
+            detalle=detalle,
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+class TokenRecuperacion(db.Model):
+    """HU-25: enlace de un solo uso para restablecer contraseña de
+    admin/personal. Se guarda un hash del token (nunca el token en
+    claro) para que una lectura de la base de datos no permita
+    reutilizar un enlace ya enviado por correo."""
+    __tablename__ = 'tokenrecuperacion'
+    idtoken     = db.Column(db.Integer, primary_key=True)
+    tipo_cuenta = db.Column(db.String(10), nullable=False)   # 'admin' o 'personal'
+    identificador = db.Column(db.Integer, nullable=False)    # documento / docpersonal
+    token_hash  = db.Column(db.String(64), nullable=False, unique=True)
+    creado      = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expira      = db.Column(db.DateTime, nullable=False)
+    usado       = db.Column(db.Boolean, nullable=False, default=False)
+
+
+def crear_token_recuperacion(tipo_cuenta, identificador, minutos_validez=30):
+    """Genera un token de un solo uso (valor en claro se retorna una
+    unica vez para el enlace por correo; solo su hash SHA-256 se
+    guarda). Invalida cualquier token anterior sin usar de esa cuenta."""
+    import hashlib
+    TokenRecuperacion.query.filter_by(
+        tipo_cuenta=tipo_cuenta, identificador=identificador, usado=False
+    ).update({'usado': True})
+
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    db.session.add(TokenRecuperacion(
+        tipo_cuenta=tipo_cuenta,
+        identificador=identificador,
+        token_hash=token_hash,
+        expira=datetime.utcnow() + timedelta(minutes=minutos_validez),
+    ))
+    db.session.commit()
+    return token
+
+
+def validar_token_recuperacion(token):
+    """Retorna el registro TokenRecuperacion valido (no usado, no
+    expirado) para ese token, o None. No lo marca como usado -- eso
+    ocurre solo al completar el cambio de contraseña."""
+    import hashlib
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    registro = TokenRecuperacion.query.filter_by(token_hash=token_hash, usado=False).first()
+    if registro is None:
+        return None
+    if registro.expira < datetime.utcnow():
+        return None
+    return registro

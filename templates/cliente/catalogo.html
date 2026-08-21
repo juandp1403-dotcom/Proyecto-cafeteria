@@ -36,6 +36,7 @@
 
   <!-- Buscador -->
   <div class="mb-4">
+    <label class="visually-hidden" for="buscador-productos">Buscar producto por nombre</label>
     <div class="input-group">
       <span class="input-group-text" style="background:var(--bg-card)"><i class="bi bi-search text-muted"></i></span>
       <input type="text" id="buscador-productos" class="form-control form-control-lg" placeholder="Buscar por nombre de producto..." onkeyup="filtrarProductos()">
@@ -52,9 +53,15 @@
            data-nombre="{{ p.nombre }}"
            data-precio="{{ p.precio }}"
            data-stock="{{ p.stock }}"
-           onclick="{% if p.stock > 0 %}toggleProducto(this){% endif %}">
+           {% if p.stock > 0 %}
+           role="button" tabindex="0" aria-label="Seleccionar {{ p.nombre }}"
+           onclick="toggleProducto(this)"
+           onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleProducto(this); }"
+           {% endif %}>
         {% if p.is_top %}
           <span class="badge position-absolute top-0 start-50 translate-middle" style="background:var(--sena-green)"><i class="bi bi-star-fill text-warning me-1"></i>Más vendido</span>
+        {% elif p.es_especial %}
+          <span class="badge position-absolute top-0 start-50 translate-middle bg-danger"><i class="bi bi-gift-fill me-1"></i>Especial</span>
         {% endif %}
         <div class="producto-emoji mb-2 mt-2">
           {% if p.imagen %}
@@ -259,9 +266,19 @@ async function confirmarPedido() {
 }
 
 function mostrarAlerta(tipo, msg) {
+  // msg puede incluir un nombre de producto controlado por el admin;
+  // se inserta con textContent (nunca innerHTML) para que no pueda
+  // ejecutar HTML/JS en el navegador del cliente.
   const div = document.createElement('div');
   div.className = `alert alert-${tipo} alert-dismissible fade show fixed-top m-3`;
-  div.innerHTML = `${msg} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+  const texto = document.createElement('span');
+  texto.textContent = msg;
+  const btnCerrar = document.createElement('button');
+  btnCerrar.type = 'button';
+  btnCerrar.className = 'btn-close';
+  btnCerrar.setAttribute('data-bs-dismiss', 'alert');
+  div.appendChild(texto);
+  div.appendChild(btnCerrar);
   document.body.prepend(div);
   setTimeout(() => div.remove(), 5000);
 }

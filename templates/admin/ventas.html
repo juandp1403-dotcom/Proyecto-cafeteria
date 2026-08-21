@@ -46,7 +46,7 @@
           <div class="d-flex align-items-center gap-3">
             <div class="text-center" style="min-width:50px">
               <div class="fw-bold fs-5" style="color:var(--sena-green)">
-                #{{ loop.index + (ventas.page - 1) * ventas.per_page }}
+                #{{ v.numero_pedido_diario or v.idventa }}
               </div>
               <small class="text-muted">Pedido</small>
             </div>

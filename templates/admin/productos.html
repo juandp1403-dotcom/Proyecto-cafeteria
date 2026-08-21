@@ -17,6 +17,9 @@
         <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
       </a>
       {% if puede('escribir_todo') %}
+      <a href="{{ url_for('admin_panel.productos_importar') }}" class="btn btn-outline-primary">
+        <i class="bi bi-upload me-1"></i>Importar Excel
+      </a>
       <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevo">
         <i class="bi bi-plus-circle me-1"></i>Nuevo Producto
       </button>
@@ -78,11 +81,11 @@
             {% if puede('escribir_todo') %}
             {% if p.activo %}
             <button class="btn btn-outline-primary btn-sm me-1"
-                    onclick="abrirEditar({{ p.idproducto }}, '{{ p.nombre|e }}', {{ p.precio }}, {{ p.stock }}, '{{ p.imagen or '' }}', {{ p.costo }}, {{ p.stock_minimo }})" title="Editar">
+                    onclick='abrirEditar({{ p.idproducto }}, {{ p.nombre|tojson }}, {{ p.precio }}, {{ p.stock }}, {{ (p.imagen or "")|tojson }}, {{ p.costo }}, {{ p.stock_minimo }}, {{ p.es_especial|tojson }})' title="Editar">
               <i class="bi bi-pencil"></i>
             </button>
             <button class="btn btn-outline-warning btn-sm me-1"
-                    onclick="abrirBaja({{ p.idproducto }}, '{{ p.nombre|e }}', {{ p.stock }})" title="Dar de baja">
+                    onclick='abrirBaja({{ p.idproducto }}, {{ p.nombre|tojson }}, {{ p.stock }})' title="Dar de baja">
               <i class="bi bi-box-arrow-down"></i>
             </button>
             <form method="POST" action="{{ url_for('admin_panel.producto_eliminar', idproducto=p.idproducto) }}"
@@ -227,7 +230,7 @@
 
 {% block extra_js %}
 <script>
-function abrirEditar(id, nombre, precio, stock, imagen, costo, stockMinimo) {
+function abrirEditar(id, nombre, precio, stock, imagen, costo, stockMinimo, esEspecial) {
   var form = document.getElementById('formEditar');
   form.action = '/admin/productos/editar/' + id;
   form.querySelector('[name=nombre]').value = nombre;
@@ -235,6 +238,8 @@ function abrirEditar(id, nombre, precio, stock, imagen, costo, stockMinimo) {
   form.querySelector('[name=stock]').value  = stock;
   form.querySelector('[name=costo]').value  = costo;
   form.querySelector('[name=stock_minimo]').value = stockMinimo;
+  var chkEspecial = form.querySelector('[name=es_especial]');
+  if (chkEspecial) chkEspecial.checked = !!esEspecial;
   var hiddenLib = form.querySelector('[name=imagen_biblioteca]');
   if (hiddenLib) hiddenLib.value = '';
   var fileInput = form.querySelector('input[type=file]');
