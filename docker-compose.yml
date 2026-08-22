@@ -1,12 +1,12 @@
 services:
   web:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile
     expose:
       - "5545"
     env_file:
-      - path: ../.env
+      - path: .env
         required: false
     networks:
       - coolify

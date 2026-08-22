@@ -68,7 +68,7 @@ volumen persistente, cada redeploy del contenedor borra las imágenes
 subidas por el equipo.
 
 En Coolify (o el orquestador que se use), monta un volumen para ambas
-rutas, por ejemplo en `docker/docker-compose.yml`:
+rutas, por ejemplo en `docker-compose.yml`:
 
 ```yaml
 services:
