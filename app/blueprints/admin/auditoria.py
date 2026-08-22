@@ -5,8 +5,7 @@ from ..permisos import requiere_ver_pagina
 from . import admin_bp
 
 
-# HU-20: consulta de solo lectura del log de auditoria -- quien hizo
-# que y cuando. Restringida a admin/auditor via PERMISOS['<rol>']['paginas'].
+# Consulta de solo lectura del log de auditoria, restringida a admin/auditor.
 @admin_bp.route('/auditoria')
 @login_required
 @requiere_ver_pagina('auditoria')

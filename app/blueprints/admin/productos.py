@@ -11,7 +11,7 @@ from . import admin_bp
 
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-MAX_IMAGE_DIMENSION = 4000  # px, HU-13: evita decompression bombs
+MAX_IMAGE_DIMENSION = 4000  # px; evita decompression bombs
 
 
 def _allowed_image(filename):
@@ -19,9 +19,8 @@ def _allowed_image(filename):
 
 
 def _es_imagen_valida(file_storage):
-    """HU-12/HU-13: verifica que el archivo sea realmente una imagen
-    valida (no solo que tenga extension de imagen) y que sus dimensiones
-    no sean excesivas."""
+    """Verifica que el archivo sea realmente una imagen (no solo la
+    extension) y que sus dimensiones no sean excesivas."""
     try:
         file_storage.stream.seek(0)
         Image.open(file_storage.stream).verify()
@@ -82,19 +81,16 @@ def _get_library_images():
     ])
 
 
-# ── CRUD Productos ────────────────────────────────────────────────────────────
 @admin_bp.route('/productos')
 @login_required
 @requiere_ver_pagina('productos')
 def productos():
-    # HU-36: por defecto solo se listan productos activos;
     # ?inactivos=1 muestra los dados de baja logicamente.
     ver_inactivos = request.args.get('inactivos') == '1'
     query = Producto.query.order_by(Producto.idproducto)
     prods = query.filter(Producto.activo.is_(False)).all() if ver_inactivos \
         else query.filter(Producto.activo.is_(True)).all()
     imagenes = _get_library_images()
-    # HU-62: ultimas bajas con auditoria (quien y cuando)
     bajas = (BajaInventario.query
              .options(db.joinedload(BajaInventario.producto))
              .order_by(BajaInventario.idbaja.desc())
@@ -129,22 +125,18 @@ def producto_nuevo():
         costo = int(request.form.get('costo', 0))
     except (ValueError, TypeError):
         costo = 0
-    # HU-38: el min="0" del formulario es solo del lado del cliente,
-    # un request directo podia guardar precio/costo/stock negativos.
+    # El min="0" del formulario es solo del lado del cliente.
     if precio < 0 or costo < 0 or stock < 0:
         flash('Precio, costo y stock no pueden ser negativos.', 'danger')
         return redirect(url_for('admin_panel.productos'))
     imagen = None
-    # Opción 1: subir nueva imagen
     new_image = request.files.get('imagen')
     if new_image and new_image.filename:
         imagen = _save_image(new_image)
     else:
-        # Opción 2: seleccionar de biblioteca existente
         lib_image = request.form.get('imagen_biblioteca', '').strip()
-        # HU-11: solo se permite copiar un nombre que realmente este en
-        # la biblioteca (antes se confiaba en el nombre recibido, un
-        # valor como ../../../../etc/passwd se concatenaba directo).
+        # Solo se permite copiar un nombre que realmente este en la
+        # biblioteca, para evitar un path traversal via ese campo.
         if lib_image and lib_image in _get_library_images():
             lib_path = os.path.join(_library_dir(), lib_image)
             if os.path.exists(lib_path):
@@ -180,7 +172,6 @@ def producto_editar(idproducto):
         nuevo_costo = int(request.form.get('costo', prod.costo))
     except (ValueError, TypeError):
         nuevo_costo = prod.costo
-    # HU-38: rechazar negativos aunque el formulario HTML los permita
     if nuevo_precio < 0 or nuevo_stock < 0 or nuevo_costo < 0:
         flash('Precio, costo y stock no pueden ser negativos.', 'danger')
         return redirect(url_for('admin_panel.productos'))
@@ -194,13 +185,11 @@ def producto_editar(idproducto):
             prod.stock_minimo = sm
     except (ValueError, TypeError):
         pass
-    # Opción 1: subir nueva imagen
     new_image = request.files.get('imagen')
     if new_image and new_image.filename:
         _delete_image(prod.imagen)
         prod.imagen = _save_image(new_image)
     else:
-        # Opción 2: seleccionar de biblioteca existente
         lib_image = request.form.get('imagen_biblioteca', '').strip()
         if lib_image and lib_image in _get_library_images():
             lib_path = os.path.join(_library_dir(), lib_image)
@@ -222,9 +211,8 @@ def producto_editar(idproducto):
 def producto_eliminar(idproducto):
     prod = Producto.query.get_or_404(idproducto)
     nombre_prod = prod.nombre
-    # HU-36: si el producto tiene historial (ventas, compras, bajas o
-    # reportes) NO se borra fisicamente: se marca inactivo para
-    # preservar el historial y las llaves foraneas que dependen de el.
+    # Si tiene historial, no se borra fisicamente: se marca inactivo
+    # para preservar ventas/compras/reportes que dependen de el.
     tiene_historial = bool(prod.detalles_venta or prod.detalles_compra or prod.bajas or prod.reportes)
     if tiene_historial:
         prod.activo = False
@@ -268,18 +256,12 @@ def producto_baja(idproducto):
         flash('La cantidad y el motivo son obligatorios.', 'danger')
         return redirect(url_for('admin_panel.productos'))
 
-    # HU-47: UPDATE condicional atomico, evita que dos bajas concurrentes
-    # dejen el stock negativo (el chequeo previo por separado era TOCTOU).
+    # UPDATE condicional atomico: evita que dos bajas concurrentes dejen el stock negativo.
     if not ajustar_stock(idproducto, -cantidad):
         flash(f'No puedes dar de baja más unidades de las que hay en stock ({prod.stock}).', 'danger')
         return redirect(url_for('admin_panel.productos'))
 
-    # HU-71: el select del formulario ya ofrece categorias fijas
-    # (Vencido/Dañado/Otro) -- se guardan en la columna estructurada
-    # 'categoria' ademas del texto libre en 'motivo', para poder agrupar
-    # reportes de perdida por categoria sin depender de texto libre.
     categoria = motivo if motivo in ('Vencido', 'Dañado', 'Otro') else 'Otro'
-    # HU-62: quien ejecuto la baja, para auditoria
     uid = current_user.get_id()
     baja = BajaInventario(
         idproducto=idproducto, cantidad=cantidad, motivo=motivo, categoria=categoria,
@@ -295,7 +277,6 @@ def producto_baja(idproducto):
     return redirect(url_for('admin_panel.productos'))
 
 
-# ── API: Imágenes de biblioteca ──────────────────────────────────────────────
 @admin_bp.route('/productos/imagenes')
 @login_required
 @requiere_permiso('escribir_todo')
@@ -431,14 +412,11 @@ def productos_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    # HU-27: limite maximo de filas (el catalogo no tiene columna de
-    # fecha para filtrar por rango, a diferencia de ventas/reportes).
     productos = Producto.query.filter(Producto.activo.is_(True)).order_by(Producto.nombre).limit(5000).all()
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventario"
 
-    # Encabezados
     headers = ['ID', 'Producto', 'Precio ($)', 'Stock', 'Estado']
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
@@ -455,7 +433,6 @@ def productos_excel():
         cell.alignment = header_align
         cell.border = thin_border
 
-    # Datos
     for row_idx, p in enumerate(productos, 2):
         ws.cell(row=row_idx, column=1, value=p.idproducto).border = thin_border
         ws.cell(row=row_idx, column=2, value=p.nombre).border = thin_border
@@ -463,7 +440,6 @@ def productos_excel():
         ws.cell(row=row_idx, column=4, value=p.stock).border = thin_border
         ws.cell(row=row_idx, column=5, value=p.estado).border = thin_border
 
-    # Ajustar anchos
     ws.column_dimensions['A'].width = 8
     ws.column_dimensions['B'].width = 30
     ws.column_dimensions['C'].width = 14

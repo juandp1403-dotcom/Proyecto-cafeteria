@@ -18,7 +18,7 @@ csrf = CSRFProtect()
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
-    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max
+    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'productos')
 
     if config_name == 'production':
@@ -33,7 +33,6 @@ def create_app(config_name='default'):
                 "y configurala en SECRET_KEY."
             )
 
-    # ── Tunel SSH → DB ──
     puerto = _abrir_tunel(config_name)
     if puerto:
         app.config['SQLALCHEMY_DATABASE_URI'] = _construir_db_url(puerto)
@@ -58,17 +57,12 @@ def create_app(config_name='default'):
     login_manager.session_protection = 'strong'
 
     if config_name == 'production':
-        # El proxy reverso (Coolify) termina el TLS y reenvia por HTTP
-        # interno; sin esto Flask ve toda peticion como no-segura y
-        # Talisman nunca emite Strict-Transport-Security.
+        # Coolify termina el TLS y reenvia por HTTP interno.
         app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-        # HU-19: cabeceras de seguridad HTTP. force_https=False porque el
-        # TLS ya lo termina el proxy reverso (Coolify) delante del
-        # contenedor -- forzarlo aqui podria causar un loop de redirects.
         Talisman(
             app,
-            force_https=False,
+            force_https=False,  # el proxy reverso ya termina el TLS
             strict_transport_security=True,
             content_security_policy={
                 'default-src': "'self'",
@@ -80,9 +74,6 @@ def create_app(config_name='default'):
             session_cookie_secure=True,
         )
 
-        # HU-03: logs con timestamp/nivel/modulo, para poder diagnosticar
-        # incidentes en produccion (antes solo quedaba el print() por
-        # defecto de Flask, sin estructura).
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter(
             '%(asctime)s %(levelname)s %(name)s: %(message)s'
@@ -111,9 +102,6 @@ def create_app(config_name='default'):
 
     @app.route('/healthz')
     def healthz():
-        # HU-03: liveness check simple, sin autenticacion ni datos
-        # sensibles -- no consulta la BD a proposito, solo confirma que
-        # el proceso Flask esta vivo y respondiendo.
         return {'status': 'ok'}, 200
 
     with app.app_context():
@@ -134,7 +122,6 @@ def load_user(user_id):
             user = Personal.query.get(int(doc))
         else:
             return None
-        # HU-36: usuarios desactivados no pueden iniciar sesion
         if user is not None and not getattr(user, 'activo', True):
             return None
         return user
@@ -142,10 +129,7 @@ def load_user(user_id):
 
 
 def _ejecutar_migracion(ddl):
-    """HU-46: ejecuta un DDL de migracion y loguea (en vez de silenciar)
-    si falla -- antes un ALTER TABLE fallido no dejaba ningun rastro,
-    la app arrancaba con un esquema distinto al esperado sin que nadie
-    se enterara hasta que algo fallaba mas adelante de forma confusa."""
+    """Ejecuta un DDL de migracion; si falla, lo loguea en vez de silenciarlo."""
     from sqlalchemy import text
     try:
         db.session.execute(text(ddl))
@@ -162,7 +146,7 @@ def _migrar_esquema():
     """Ajusta el esquema de la BD segun el motor (PostgreSQL y SQLite)."""
     uri = db.engine.url
     es_pg = uri.drivername in ('postgresql', 'postgresql+psycopg', 'postgresql+psycopg2')
-    from sqlalchemy import text, inspect
+    from sqlalchemy import inspect
     insp = inspect(db.engine)
 
     def columna_existe(tabla, columna):
@@ -172,61 +156,32 @@ def _migrar_esquema():
             return False
 
     def agregar_columna(tabla, columna, ddl_pg, ddl_sqlite):
-        """Agrega una columna de forma segura en ambos motores, logueando
-        el fallo (HU-46) en vez de silenciarlo."""
         ddl = ddl_pg if es_pg else ddl_sqlite
         if not es_pg and columna_existe(tabla, columna):
             return
         _ejecutar_migracion(ddl)
 
-    if not es_pg:
-        # SQLite (desarrollo local): las tablas nuevas ya salen completas
-        # de db.create_all(), solo faltan columnas agregadas a modelos
-        # que ya existian antes de este cambio.
-        pass
-    else:
+    if es_pg:
         _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)")
-        # HU-56: venta.fechaventa pasa de DATE a TIMESTAMP para conservar la hora real
         _ejecutar_migracion("ALTER TABLE venta ALTER COLUMN fechaventa TYPE TIMESTAMP USING fechaventa::timestamp")
-        # Unificar el rol de entrega: 'entregador' no existe en PERMISOS, el
-        # valor canonico es 'despachador' (ver HU-33)
         _ejecutar_migracion("UPDATE admin SET rol = 'despachador' WHERE rol = 'entregador'")
-        # Ampliar longitud de nombre de producto/cliente (el codigo permite
-        # hasta 100 caracteres). Ampliar un VARCHAR nunca trunca datos.
         _ejecutar_migracion("ALTER TABLE producto ALTER COLUMN nombre TYPE VARCHAR(100)")
         _ejecutar_migracion("ALTER TABLE cliente ALTER COLUMN nombre TYPE VARCHAR(100)")
-        # admin.email: el login busca por email, sin unicidad dos cuentas
-        # podrian compartir correo. Si falla por duplicados existentes, el
-        # equipo debe depurarlos a mano (queda logueado, no silencioso).
         _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN email TYPE VARCHAR(120)")
         _ejecutar_migracion("ALTER TABLE admin ADD CONSTRAINT admin_email_key UNIQUE (email)")
-        # Bug de esquema encontrado en la base real: 'reporte' tenia UNIQUE
-        # en idadmin y en producto, impidiendo que un mismo admin creara mas
-        # de un reporte, o que un producto apareciera en mas de un reporte.
         _ejecutar_migracion("ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_idadmin_key")
         _ejecutar_migracion("ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_producto_key")
-        # HU-54: personal.email limitado a 30 hacia fallar la creacion de
-        # personal con un correo institucional normal.
         _ejecutar_migracion("ALTER TABLE personal ALTER COLUMN email TYPE VARCHAR(120)")
-        # HU-61: indices en las columnas mas consultadas (dashboard, catalogo,
-        # reportes). CREATE INDEX no bloquea escrituras de forma relevante en
-        # una tabla de este tamaño.
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_venta_fechaventa ON venta (fechaventa)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_venta_estado ON venta (estado)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_venta_cliente ON venta (cliente)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)")
-        # Bug de datos encontrado en la BD real: existe una columna 'preciou'
-        # huerfana en detalleventa (NOT NULL, sin default) que no aparece en
-        # ningun lugar del codigo ni del historial de git -- quedo de una
-        # intervencion manual anterior sobre la BD. El modelo actual usa
-        # 'precio_unitario' y nunca llena 'preciou', asi que bloqueaba
-        # CUALQUIER insert nuevo en detalleventa (ej. HU-49: confirmar
-        # pedido del cliente devolvia 500 en produccion).
+        # 'preciou' es una columna huerfana en la BD real (no existe en el
+        # modelo ni en el historial de git); bloqueaba cualquier insert nuevo.
         _ejecutar_migracion("ALTER TABLE detalleventa ALTER COLUMN preciou DROP NOT NULL")
 
-    # ── Columnas agregadas en cambios anteriores (ambos motores) ──
     agregar_columna('producto', 'imagen',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)",
                     "ALTER TABLE producto ADD COLUMN imagen VARCHAR(255)")
@@ -242,30 +197,23 @@ def _migrar_esquema():
     agregar_columna('producto', 'costo',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS costo INT NOT NULL DEFAULT 0",
                     "ALTER TABLE producto ADD COLUMN costo INT NOT NULL DEFAULT 0")
-    # HU-71: categorizar el motivo de baja de inventario
     agregar_columna('bajainventario', 'categoria',
                     "ALTER TABLE bajainventario ADD COLUMN IF NOT EXISTS categoria VARCHAR(20) NOT NULL DEFAULT 'Otro'",
                     "ALTER TABLE bajainventario ADD COLUMN categoria VARCHAR(20) NOT NULL DEFAULT 'Otro'")
-    # HU-68: destacar producto especial/promocion del dia
     agregar_columna('producto', 'es_especial',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS es_especial BOOLEAN NOT NULL DEFAULT FALSE",
                     "ALTER TABLE producto ADD COLUMN es_especial BOOLEAN NOT NULL DEFAULT 0")
     agregar_columna('producto', 'especial_hasta',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS especial_hasta DATE",
                     "ALTER TABLE producto ADD COLUMN especial_hasta DATE")
-    # HU-76: metodo de pago de la venta
     agregar_columna('venta', 'metodo_pago',
                     "ALTER TABLE venta ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(20)",
                     "ALTER TABLE venta ADD COLUMN metodo_pago VARCHAR(20)")
-    # HU-57: numero de pedido consecutivo diario persistido, reemplaza
-    # las tres numeraciones distintas que no coincidian entre si.
     agregar_columna('venta', 'numero_pedido_diario',
                     "ALTER TABLE venta ADD COLUMN IF NOT EXISTS numero_pedido_diario INTEGER",
                     "ALTER TABLE venta ADD COLUMN numero_pedido_diario INTEGER")
     if es_pg:
-        # El backfill con ROW_NUMBER solo corre en PostgreSQL -- en SQLite
-        # (desarrollo) la columna ya sale poblada por confirmar() para
-        # ventas nuevas, y no hay datos legacy que rellenar.
+        # Backfill del consecutivo diario; en SQLite no hay datos legacy que rellenar.
         _ejecutar_migracion("""
             UPDATE venta SET numero_pedido_diario = sub.n
             FROM (
@@ -275,21 +223,18 @@ def _migrar_esquema():
             WHERE venta.idventa = sub.idventa AND venta.numero_pedido_diario IS NULL
         """)
 
-    # ── HU-35: precio historico por detalle de venta ──
     agregar_columna(
         'detalleventa', 'precio_unitario',
         "ALTER TABLE detalleventa ADD COLUMN IF NOT EXISTS precio_unitario INT NOT NULL DEFAULT 0",
         "ALTER TABLE detalleventa ADD COLUMN precio_unitario INT NOT NULL DEFAULT 0",
     )
-    # Backfill: filas legacy se rellenan con el precio ACTUAL del producto
-    # (mejor aproximacion posible; las ventas nuevas ya guardan su precio real).
+    # Backfill de filas legacy con el precio actual del producto.
     _ejecutar_migracion(
         "UPDATE detalleventa SET precio_unitario = "
         "COALESCE((SELECT p.precio FROM producto p WHERE p.idproducto = detalleventa.idproducto), 0) "
         "WHERE precio_unitario IS NULL OR precio_unitario = 0"
     )
 
-    # ── HU-62: auditoria (quien y cuando) ──
     agregar_columna('producto', 'created_at',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS created_at TIMESTAMP",
                     "ALTER TABLE producto ADD COLUMN created_at TIMESTAMP")
@@ -309,7 +254,6 @@ def _migrar_esquema():
                     "ALTER TABLE bajainventario ADD COLUMN IF NOT EXISTS usuario_tipo VARCHAR(20)",
                     "ALTER TABLE bajainventario ADD COLUMN usuario_tipo VARCHAR(20)")
 
-    # ── HU-36: borrado logico ──
     agregar_columna('producto', 'activo',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE",
                     "ALTER TABLE producto ADD COLUMN activo BOOLEAN NOT NULL DEFAULT 1")
@@ -322,12 +266,8 @@ def _migrar_esquema():
 
 
 def _clave_seed(env_var, default_dev, config_name):
-    """HU-15: en produccion, si la contraseña no esta configurada por
-    variable de entorno, se genera una aleatoria y se imprime UNA VEZ
-    en el log de arranque, en vez de usar una contraseña predecible
-    (Admin123, etc.) que queda documentada en el propio repositorio.
-    En desarrollo se mantiene el valor por defecto para no complicar
-    el flujo local."""
+    """En produccion, si falta la contraseña por variable de entorno, se
+    genera una aleatoria y se imprime una sola vez en el log de arranque."""
     valor = os.environ.get(env_var)
     if valor:
         return valor

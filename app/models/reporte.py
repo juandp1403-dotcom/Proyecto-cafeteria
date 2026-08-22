@@ -11,8 +11,6 @@ class Reporte(db.Model):
     producto    = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
 
     prod_rel  = db.relationship('Producto', backref='reportes')
-    # HU-22: to_dict() referenciaba self.admin_rel sin que existiera la
-    # relacion (AttributeError garantizado si alguna vez se llamaba).
     admin_rel = db.relationship('Admin', backref='reportes_creados')
 
     def to_dict(self):

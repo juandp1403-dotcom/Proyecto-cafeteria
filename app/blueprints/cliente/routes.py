@@ -19,17 +19,13 @@ def registro():
         if not doc or not nombre or not ficha:
             return render_template('cliente/registro.html', error='Completa todos los campos.')
 
-        # HU-65: el consentimiento es obligatorio (validacion en backend,
-        # no solo en el HTML) conforme a la Ley 1581 de 2012.
         if not request.form.get('autorizo_datos'):
             return render_template(
                 'cliente/registro.html',
                 error='Debes autorizar el tratamiento de tus datos personales conforme a la Ley 1581 de 2012 para continuar.')
 
-        # Las columnas son db.Integer (32 bits en PostgreSQL); un numero
-        # fuera de ese rango no es un documento/ficha valido y antes
-        # llegaba sin validar hasta el driver de BD, donde SQLite lo
-        # rechazaba con un OverflowError sin manejar (500).
+        # Las columnas son db.Integer (32 bits); un numero fuera de rango
+        # rompia el driver de BD sin manejar (500).
         try:
             doc   = int(doc)
             ficha = int(ficha)
@@ -38,10 +34,8 @@ def registro():
         except ValueError:
             return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos válidos.')
 
-        # HU-08: si el documento ya existe, exigir que nombre y ficha
-        # coincidan exactamente con lo guardado antes de reutilizar esa
-        # identidad -- antes cualquiera que conociera un documento ajeno
-        # podia sobrescribir el nombre y ver el historial de esa persona.
+        # Si el documento ya existe, exige que nombre y ficha coincidan
+        # para reutilizar esa identidad (evita suplantar a otro cliente).
         cliente = Cliente.query.get(doc)
         if not cliente:
             cliente = Cliente(documento=doc, nombre=nombre, ficha=ficha)
@@ -66,20 +60,15 @@ def registro():
 
 @cliente_bp.route('/catalogo')
 def catalogo():
-    # Permite acceso si hay sesión de cliente O si el usuario es admin autenticado
     if 'cliente_doc' not in session and not current_user.is_authenticated:
         return redirect(url_for('cliente.registro'))
-        
+
     from sqlalchemy import func, case
-    
+
     estados_pagados = ('Pagado/Preparando', 'Preparado', 'Entregado')
-    
-    # Obtener cantidad vendida por producto.
-    # Se usa CASE dentro de SUM para contar solo ventas con estado válido,
-    # de modo que TODOS los productos aparecen siempre (con 0 si no tienen
-    # ventas calificadas). Así se evita que un producto con solo ventas
-    # 'Pendiente de Pago' o 'Cancelado' desaparezca del catálogo.
-    # HU-36: solo productos activos en el catalogo de cliente
+
+    # Cantidad vendida por producto, contando solo ventas con estado
+    # valido, para que todos los productos aparezcan (con 0 si no aplica).
     total_vendido_expr = func.coalesce(
         func.sum(case((Venta.estado.in_(estados_pagados), DetalleVenta.cantidad), else_=0)),
         0
@@ -92,28 +81,23 @@ def catalogo():
             .group_by(Producto.idproducto)
             .order_by(total_vendido_expr.desc())
             .all())
-    
-    # Separar: top 10 más vendidos y el resto
+
     mapa_ventas = {r.idproducto: int(r.total_vendido) for r in rows}
     ids_por_venta = [r.idproducto for r in rows]
-    
+
     top_10_ids = ids_por_venta[:10]
     resto_ids  = ids_por_venta[10:]
-    
-    # Obtener objetos Producto
+
     top_10 = Producto.query.filter(Producto.idproducto.in_(top_10_ids)).all()
-    # Mantener orden por cantidad vendida
     top_10.sort(key=lambda p: top_10_ids.index(p.idproducto) if p.idproducto in top_10_ids else 999)
-    
+
     resto = Producto.query.filter(Producto.idproducto.in_(resto_ids)).order_by(Producto.nombre).all()
-    
-    # Combinar: primero top 10, luego resto alfabético
+
     productos_ordenados = top_10 + resto
-    
-    # Marcar los top 10 que tengan ventas
+
     for p in productos_ordenados:
         p.is_top = p.idproducto in top_10_ids and mapa_ventas.get(p.idproducto, 0) > 0
-        
+
     return render_template('cliente/catalogo.html', productos=productos_ordenados)
 
 
@@ -129,13 +113,11 @@ def confirmar():
     if not items:
         return jsonify({'error': 'Carrito vacio'}), 400
 
-    # HU-49: limitar cuantos items distintos puede traer un pedido, y
-    # consolidar cantidades repetidas del mismo producto ANTES de
-    # validar el tope de 100 -- antes se podia evadir ese tope
-    # repitiendo el mismo producto en varias filas del carrito.
     if len(items) > 50:
         return jsonify({'error': 'El pedido tiene demasiados items distintos (maximo 50)'}), 400
 
+    # Consolida cantidades repetidas del mismo producto antes de validar
+    # el tope, para que no se pueda evadir repitiendo filas.
     cantidades_por_producto = {}
     for item in items:
         try:
@@ -161,7 +143,7 @@ def confirmar():
         detalles_a_guardar.append((prod, cantidad))
         total += prod.precio * cantidad
 
-    # Descuento atomico de stock con UPDATE condicional
+    # Descuento atomico de stock con UPDATE condicional.
     for prod, cant in detalles_a_guardar:
         affected = Producto.query.filter(
             Producto.idproducto == prod.idproducto,
@@ -171,19 +153,12 @@ def confirmar():
             db.session.rollback()
             return jsonify({'error': f'Stock insuficiente para {prod.nombre}'}), 400
 
-    # HU-76: metodo de pago opcional, necesario para el futuro cierre
-    # de caja (HU-75) y para que los reportes reflejen como entra el
-    # dinero real, no solo el total.
     metodos_validos = {'Efectivo', 'Tarjeta', 'Transferencia'}
     metodo_pago = data.get('metodo_pago')
     if metodo_pago not in metodos_validos:
         metodo_pago = 'Efectivo'
 
-    # HU-57: numero de pedido consecutivo del dia, calculado y guardado
-    # una sola vez al crear la venta (no como propiedad recalculada en
-    # cada lectura). No es perfectamente a prueba de condiciones de
-    # carrera bajo concurrencia muy alta, pero es la misma fuente para
-    # cliente y cajero -- ya no hay tres numeraciones que no coinciden.
+    # Numero de pedido consecutivo del dia, calculado una sola vez al crear la venta.
     hoy = hoy_bogota()
     ultimo_numero = (db.session.query(func.coalesce(func.max(Venta.numero_pedido_diario), 0))
                       .filter(expr_fecha(Venta.fechaventa) == hoy)
@@ -234,10 +209,7 @@ def estado_pedido(idventa):
 @cliente_bp.route('/estado/<int:idventa>/json')
 @limiter.limit("20 per minute")
 def estado_pedido_json(idventa):
-    """HU-26: endpoint liviano para el polling de la pantalla de estado
-    -- solo el estado, sin recargar toda la pagina. Mismo control de
-    acceso que la vista HTML; limite de frecuencia para que el polling
-    del navegador no pueda usarse para golpear el servidor."""
+    """Endpoint liviano para el polling de la pantalla de estado."""
     venta = Venta.query.get_or_404(idventa)
     es_propietario = 'cliente_doc' in session and session['cliente_doc'] == venta.cliente
     es_admin = current_user.is_authenticated
@@ -248,17 +220,16 @@ def estado_pedido_json(idventa):
 
 @cliente_bp.route('/cancelar/<int:idventa>', methods=['POST'])
 def cancelar_pedido(idventa):
-    """HU-29: el cliente puede cancelar su propio pedido mientras siga
-    en 'Pendiente de Pago', devolviendo el stock igual que cuando lo
-    rechaza un cajero."""
+    """El cliente puede cancelar su propio pedido mientras siga 'Pendiente
+    de Pago', devolviendo el stock igual que cuando lo rechaza un cajero."""
     venta = Venta.query.get_or_404(idventa)
     if 'cliente_doc' not in session or session['cliente_doc'] != venta.cliente:
         flash('No tienes acceso a este pedido.', 'danger')
         return redirect(url_for('cliente.registro'))
 
     detalles = list(venta.detalles)
-    # UPDATE condicionado al estado actual (mismo patron que HU-48 en
-    # admin/ventas.py), para que un doble clic no devuelva el stock dos veces.
+    # UPDATE condicionado al estado actual para que un doble clic no
+    # devuelva el stock dos veces.
     afectados = Venta.query.filter(
         Venta.idventa == idventa, Venta.estado == 'Pendiente de Pago'
     ).update({'estado': 'Cancelado'}, synchronize_session=False)
@@ -284,7 +255,6 @@ def salir():
     return redirect(url_for('cliente.registro'))
 
 
-# ── HU-65/66: privacidad y derecho de supresion (Ley 1581 de 2012) ──
 @cliente_bp.route('/privacidad')
 def privacidad():
     return render_template('cliente/privacidad.html')

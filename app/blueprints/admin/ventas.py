@@ -7,7 +7,6 @@ from ...utils import ahora_bogota, hoy_bogota
 from . import admin_bp
 
 
-# ── Histórico de ventas ───────────────────────────────────────────────────────
 @admin_bp.route('/ventas')
 @login_required
 @requiere_ver_pagina('ventas')
@@ -39,10 +38,8 @@ def ventas():
 
 
 def _transicion_venta(idventa, estados_validos, estado_nuevo):
-    """HU-48: UPDATE condicionado al estado ACTUAL en la base de datos,
-    no al que se leyo minutos antes -- asi un doble clic (dos requests
-    casi simultaneos) solo aplica el efecto una vez, la segunda
-    peticion ya no encuentra el estado esperado y no hace nada."""
+    """UPDATE condicionado al estado actual en BD, para que un doble
+    clic no aplique el efecto dos veces."""
     if isinstance(estados_validos, str):
         estados_validos = (estados_validos,)
     afectados = Venta.query.filter(
@@ -71,7 +68,6 @@ def venta_rechazar(idventa):
     venta = Venta.query.get_or_404(idventa)
     detalles = list(venta.detalles)  # leer antes de la transicion
     if _transicion_venta(idventa, 'Pendiente de Pago', 'Cancelado'):
-        # HU-47: UPDATE atomico por producto, no lectura+escritura
         for det in detalles:
             ajustar_stock(det.idproducto, det.cantidad)
         db.session.commit()
@@ -81,7 +77,6 @@ def venta_rechazar(idventa):
     return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
 
 
-# ── Cambio de estado en ventas ────────────────────────────────────────────────
 @admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
 @login_required
 @requiere_permiso('cambiar_estado_entrega')
@@ -114,8 +109,8 @@ def ventas_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    # HU-27: rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD).
-    # Sin parametros, mantiene el comportamiento original (solo hoy).
+    # Rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD); sin
+    # parametros, exporta solo el dia de hoy.
     MAX_FILAS_EXCEL = 5000
     desde_str = request.args.get('desde')
     hasta_str = request.args.get('hasta')
@@ -154,8 +149,7 @@ def ventas_excel():
         cell.alignment = header_align
         cell.border = thin_border
 
-    # HU-59: sin el permiso ver_datos_personales, el Excel exporta
-    # nombre/documento/ficha enmascarados en vez de bloquear la descarga.
+    # Sin el permiso ver_datos_personales, exporta datos enmascarados.
     ver_datos = puede('ver_datos_personales')
 
     for row_idx, v in enumerate(ventas, 2):

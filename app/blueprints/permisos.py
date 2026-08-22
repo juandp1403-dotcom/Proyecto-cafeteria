@@ -5,14 +5,8 @@ from flask_login import current_user
 
 PAGINAS_ADMIN = ['dashboard', 'productos', 'ventas', 'compras', 'usuarios', 'reportes', 'auditoria']
 
-# HU-59, combinado: el equipo (Juanes, commit 0444005) resolvio el
-# enmascarado de datos personales ('ver_datos_personales' + helpers
-# iniciales()/doc_enmascarado()). A eso le faltaba el otro criterio de
-# aceptacion de la historia original: "un cajero ya no puede ABRIR la
-# gestion de usuarios del personal" -- por eso 'usuarios' se quita de
-# las paginas de cajero, mientras que auditor (que necesita ver el
-# listado, solo que sin datos completos) la conserva enmascarada.
-# 'auditoria' es HU-20, sin relacion con HU-59, solo para admin/auditor.
+# El cajero no puede abrir gestion de usuarios; el auditor si, pero con
+# los datos personales enmascarados (ver iniciales/doc_enmascarado).
 PERMISOS = {
     'admin': {
         'ver_todo': True,
@@ -113,7 +107,6 @@ def registrar_context_processor(app):
         )
 
 
-# ── HU-59: helpers de enmascaramiento de datos personales ──
 def iniciales(nombre):
     """Iniciales de un nombre para mostrar cuando no hay permiso de ver datos."""
     if not nombre:

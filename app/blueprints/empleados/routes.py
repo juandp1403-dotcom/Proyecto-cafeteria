@@ -9,10 +9,8 @@ from ...extensions import limiter
 from ...correo import enviar_correo
 from . import empleados_bp
 
-# HU-52: hash dummy fijo para igualar el tiempo de respuesta cuando el
-# email no existe en ninguna tabla -- sin esto, la ausencia de un
-# check_password_hash real hacia la respuesta medible mas rapida,
-# permitiendo enumerar correos del personal por temporizacion.
+# Hash dummy para igualar el tiempo de respuesta cuando el email no
+# existe, y evitar enumerar correos por temporizacion.
 _HASH_DUMMY = generate_password_hash('valor-que-nunca-va-a-coincidir')
 
 
@@ -55,7 +53,6 @@ def logout():
     return redirect(url_for('cliente.registro'))
 
 
-# ── HU-25: recuperacion de contrasena ────────────────────────────────────────
 @empleados_bp.route('/olvide-clave', methods=['GET', 'POST'])
 @limiter.limit("3 per minute", methods=['POST'])
 def olvide_clave():
@@ -64,8 +61,7 @@ def olvide_clave():
         admin = Admin.query.filter_by(email=email).first()
         personal = Personal.query.filter_by(email=email).first() if not admin else None
 
-        # HU-52: mismo mensaje exista o no la cuenta -- no revelar por
-        # esta via si un correo esta registrado.
+        # Mismo mensaje exista o no la cuenta, para no revelar el correo.
         if admin:
             token = crear_token_recuperacion('admin', admin.documento)
             enlace = url_for('empleados.restablecer_clave', token=token, _external=True)
@@ -100,7 +96,6 @@ def restablecer_clave(token):
 
     if request.method == 'POST':
         nueva_clave = request.form.get('clave', '').strip()
-        # HU-17: misma politica de contrasenas que crear/editar usuario.
         if len(nueva_clave) < 8 or not any(c.isalpha() for c in nueva_clave) or not any(c.isdigit() for c in nueva_clave):
             flash('La contraseña debe tener al menos 8 caracteres y combinar letras y números.', 'danger')
             return render_template('empleados/restablecer_clave.html', token=token)

@@ -7,7 +7,6 @@ from ...utils import ahora_bogota, hoy_bogota
 from . import admin_bp
 
 
-# ── Reportes ──────────────────────────────────────────────────────────────────
 @admin_bp.route('/reportes')
 @login_required
 @requiere_ver_pagina('reportes')
@@ -63,8 +62,7 @@ def reportes_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    # HU-27: rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD)
-    # y limite maximo de filas -- antes se exportaba todo el historico sin limite.
+    # Rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD).
     MAX_FILAS_EXCEL = 5000
     query = Reporte.query.options(db.joinedload(Reporte.prod_rel))
     desde_str = request.args.get('desde')

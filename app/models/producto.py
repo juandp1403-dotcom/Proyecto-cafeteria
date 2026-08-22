@@ -11,15 +11,12 @@ class Producto(db.Model):
     imagen       = db.Column(db.String(255), nullable=True, default=None)
     stock_minimo = db.Column(db.Integer, nullable=False, default=10)
     costo        = db.Column(db.Integer, nullable=False, default=0)
-    # HU-68: destacar un producto como especial/promocion del dia en el
-    # catalogo. especial_hasta es opcional -- si se pone, la promocion
-    # se considera vencida despues de esa fecha (logica en el codigo).
+    # especial_hasta opcional: si se pone, la promocion vence esa fecha.
     es_especial     = db.Column(db.Boolean, nullable=False, default=False)
     especial_hasta  = db.Column(db.Date, nullable=True)
-    # HU-62: auditoria (quien/cuando se creo y modifico por ultima vez)
     created_at   = db.Column(db.DateTime, default=ahora_bogota)
     updated_at   = db.Column(db.DateTime, default=ahora_bogota, onupdate=ahora_bogota)
-    # HU-36: borrado logico; los productos con historial nunca se borran fisicamente
+    # Borrado logico: los productos con historial nunca se borran fisicamente.
     activo       = db.Column(db.Boolean, nullable=False, default=True)
 
     detalles_venta  = db.relationship('DetalleVenta',  back_populates='producto')
@@ -51,11 +48,8 @@ class Producto(db.Model):
 
 
 def ajustar_stock(idproducto, delta):
-    """Ajusta el stock de un producto con un UPDATE condicional atomico,
-    para que dos operaciones concurrentes (venta, baja, rechazo, compra)
-    no se pisen entre si. Si delta es negativo, exige que el stock
-    resultante no quede negativo. Devuelve True si se aplico el ajuste,
-    False si no habia stock suficiente (delta negativo)."""
+    """UPDATE condicional atomico para que operaciones concurrentes no se
+    pisen. Devuelve True si se aplico, False si no habia stock suficiente."""
     query = Producto.query.filter(Producto.idproducto == idproducto)
     if delta < 0:
         query = query.filter(Producto.stock >= -delta)

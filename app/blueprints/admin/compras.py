@@ -6,7 +6,6 @@ from ...utils import hoy_bogota
 from . import admin_bp
 
 
-# ── Compras / Abastecimiento ──────────────────────────────────────────────────
 @admin_bp.route('/compras')
 @login_required
 @requiere_ver_pagina('compras')
@@ -41,8 +40,7 @@ def compra_nueva():
             continue
         prod = Producto.query.get(pid_int)
         if prod and cant_int > 0:
-            # HU-37: la compra se registra al COSTO real del producto,
-            # no al precio de venta.
+            # Se registra al costo real del producto, no al precio de venta.
             total += prod.costo * cant_int
             detalles.append((prod, cant_int))
 
@@ -58,7 +56,7 @@ def compra_nueva():
     for prod, cant in detalles:
         dc = DetalleCompra(idcompra=compra.idcompra, idproducto=prod.idproducto, cantidad=cant)
         db.session.add(dc)
-        ajustar_stock(prod.idproducto, cant)  # HU-47: UPDATE atomico
+        ajustar_stock(prod.idproducto, cant)
 
     db.session.commit()
     flash('Compra registrada y stock actualizado.', 'success')

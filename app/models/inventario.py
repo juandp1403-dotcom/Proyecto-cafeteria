@@ -9,11 +9,9 @@ class BajaInventario(db.Model):
     idproducto = db.Column(db.Integer, db.ForeignKey('producto.idproducto'), nullable=False)
     cantidad   = db.Column(db.Integer, nullable=False)
     motivo     = db.Column(db.String(255), nullable=False)
-    # HU-71: categoria estructurada, separada del texto libre de motivo,
-    # para poder agrupar cuanto se pierde por vencimiento vs. dano vs. otro.
     categoria  = db.Column(db.String(20), nullable=False, default='Otro')
     fecha      = db.Column(db.Date, default=hoy_bogota)
-    # HU-62: quien ejecuto la baja (Admin o Personal; sin FK por ser tablas distintas)
+    # Admin o Personal; sin FK por ser tablas distintas.
     usuario_documento = db.Column(db.Integer, nullable=True)
     usuario_tipo      = db.Column(db.String(20), nullable=True)  # 'admin' | 'personal'
 

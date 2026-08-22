@@ -10,13 +10,9 @@ _tunnel = None
 
 
 def _cargar_ssh_host_key(ssh_host):
-    """Carga la clave de host SSH esperada desde SSH_HOST_KEY, en formato
-    known_hosts ('tipo base64key', ej. 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5...').
-    Se obtiene una vez con: ssh-keyscan -t ed25519 <host>
-
-    Sin esto, SSHTunnelForwarder acepta CUALQUIER clave de host que
-    presente el servidor remoto (riesgo de intercepcion MITM del trafico
-    hacia la base de datos) — HU-43."""
+    """Carga la clave de host esperada desde SSH_HOST_KEY (formato
+    known_hosts). Sin ella, el tunel aceptaria cualquier clave de host
+    del servidor remoto (riesgo de MITM)."""
     linea = os.environ.get('SSH_HOST_KEY')
     if not linea:
         return None
@@ -87,9 +83,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TIMEZONE = 'America/Bogota'
-    # HU-45: si el tunel SSH se cae o hay un timeout de red, sin esto el
-    # pool reutiliza conexiones muertas y falla el primer request tras
-    # un rato de inactividad ("server closed the connection unexpectedly").
+    # Evita reutilizar conexiones muertas tras un timeout del tunel SSH.
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 1800,

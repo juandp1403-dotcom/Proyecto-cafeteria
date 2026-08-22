@@ -8,10 +8,9 @@ from . import admin_bp
 
 
 def _ultimos_12_meses(hoy):
-    """HU-55: los ultimos 12 meses de calendario terminando en `hoy`,
-    con aritmetica real (year*12+month) en vez de aproximar un mes a 30
-    dias -- esa aproximacion acumula deriva y llega a saltarse meses
-    como febrero. Devuelve [(clave 'YYYY-MM', etiqueta 'Mon YYYY'), ...]."""
+    """Ultimos 12 meses de calendario terminando en `hoy`, con
+    aritmetica real (year*12+month) para no acumular deriva de
+    aproximar un mes a 30 dias. Devuelve [(clave 'YYYY-MM', etiqueta 'Mon YYYY'), ...]."""
     mes_absoluto_actual = hoy.year * 12 + (hoy.month - 1)
     resultado = []
     for i in range(12, 0, -1):
@@ -22,7 +21,6 @@ def _ultimos_12_meses(hoy):
     return resultado
 
 
-# ── Dashboard ────────────────────────────────────────────────────────────────
 @admin_bp.route('/')
 @login_required
 @requiere_ver_pagina('dashboard')

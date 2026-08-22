@@ -3,8 +3,8 @@ from .base import db
 
 
 class SolicitudSupresion(db.Model):
-    """HU-65/66: registro trazable de solicitudes de supresion de datos
-    personales (Ley 1581 de 2012). Un admin las procesa manualmente."""
+    """Solicitud de supresion de datos personales (Ley 1581 de 2012),
+    procesada manualmente por un admin."""
     __tablename__ = 'solicitudsupresion'
     idsolicitud       = db.Column(db.Integer, primary_key=True)
     documento_cliente = db.Column(db.Integer, nullable=False)

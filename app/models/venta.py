@@ -16,32 +16,17 @@ class Venta(db.Model):
     idventa    = db.Column(db.Integer, primary_key=True)
     precio     = db.Column(db.Integer, nullable=False)
     cliente    = db.Column(db.Integer, db.ForeignKey('cliente.documento'), nullable=False)
-    # HU-56: fecha Y hora reales en zona America/Bogota
     fechaventa = db.Column(db.DateTime, default=ahora_bogota)
     estado     = db.Column(db.String(30), nullable=False, default='Pendiente de Pago')
-    # HU-76: como se pago la venta -- necesario para el cierre de caja
-    # (HU-75, pendiente) y para que los reportes reflejen la realidad
-    # de como entra el dinero, no solo el total.
     metodo_pago = db.Column(db.String(20), nullable=True)
-    # HU-57: numero de pedido consecutivo DENTRO DEL DIA, persistido al
-    # crear la venta (antes existian tres numeraciones distintas que no
-    # coincidian entre si: el id global en la factura del cliente, un
-    # indice de paginacion en la lista del cajero, y esta misma logica
-    # pero calculada de nuevo en cada lectura via COUNT -- ahora es una
-    # sola fuente, escrita una vez). NO reintroducir como @property: ya
-    # se probo ese enfoque y hacia una consulta N+1 por venta.
+    # Consecutivo dentro del dia, escrito una sola vez al crear la venta.
+    # No reintroducir como @property: hacia una consulta N+1 por venta.
     numero_pedido_diario = db.Column(db.Integer, nullable=True)
-    # HU-62: auditoria
     created_at = db.Column(db.DateTime, default=ahora_bogota)
     updated_at = db.Column(db.DateTime, default=ahora_bogota, onupdate=ahora_bogota)
 
     cliente_rel = db.relationship('Cliente',      back_populates='ventas')
     detalles    = db.relationship('DetalleVenta', back_populates='venta', cascade='all, delete-orphan')
-
-    # HU-22: to_dict() nunca se usa en ningun lado del codigo (verificado
-    # por grep) y dependia de numero_pedido_diario, que hace una consulta
-    # N+1 por venta -- se elimina en vez de dejarlo como codigo muerto
-    # con una trampa de rendimiento.
 
 
 class DetalleVenta(db.Model):

@@ -6,10 +6,8 @@ from .base import db
 
 
 class TokenRecuperacion(db.Model):
-    """HU-25: enlace de un solo uso para restablecer contraseña de
-    admin/personal. Se guarda un hash del token (nunca el token en
-    claro) para que una lectura de la base de datos no permita
-    reutilizar un enlace ya enviado por correo."""
+    """Enlace de un solo uso para restablecer contraseña; se guarda solo
+    el hash del token, nunca el valor en claro."""
     __tablename__ = 'tokenrecuperacion'
     idtoken     = db.Column(db.Integer, primary_key=True)
     tipo_cuenta = db.Column(db.String(10), nullable=False)   # 'admin' o 'personal'
@@ -21,9 +19,8 @@ class TokenRecuperacion(db.Model):
 
 
 def crear_token_recuperacion(tipo_cuenta, identificador, minutos_validez=30):
-    """Genera un token de un solo uso (valor en claro se retorna una
-    unica vez para el enlace por correo; solo su hash SHA-256 se
-    guarda). Invalida cualquier token anterior sin usar de esa cuenta."""
+    """Genera un token de un solo uso e invalida cualquier token anterior
+    sin usar de esa cuenta."""
     TokenRecuperacion.query.filter_by(
         tipo_cuenta=tipo_cuenta, identificador=identificador, usado=False
     ).update({'usado': True})
@@ -41,9 +38,8 @@ def crear_token_recuperacion(tipo_cuenta, identificador, minutos_validez=30):
 
 
 def validar_token_recuperacion(token):
-    """Retorna el registro TokenRecuperacion valido (no usado, no
-    expirado) para ese token, o None. No lo marca como usado -- eso
-    ocurre solo al completar el cambio de contraseña."""
+    """Retorna el registro valido (no usado, no expirado) para ese
+    token, o None. No lo marca como usado."""
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     registro = TokenRecuperacion.query.filter_by(token_hash=token_hash, usado=False).first()
     if registro is None:

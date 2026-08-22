@@ -7,11 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 def enviar_correo(destinatario, asunto, cuerpo):
-    """HU-25: envia un correo via SMTP configurado por variables de
-    entorno (SMTP_HOST/PORT/USER/PASS/FROM). Si SMTP_HOST no esta
-    configurado (entorno local sin credenciales reales), el correo se
-    imprime en el log en vez de fallar -- para no bloquear el flujo de
-    desarrollo local. Nunca lanza una excepcion hacia el llamador."""
+    """Envia un correo via SMTP (variables SMTP_HOST/PORT/USER/PASS/FROM).
+    Sin SMTP_HOST, solo lo imprime en el log. Nunca lanza excepcion."""
     host = os.environ.get('SMTP_HOST')
     if not host:
         logger.warning(

@@ -5,14 +5,12 @@ from ..permisos import requiere_permiso, requiere_ver_pagina
 from . import admin_bp
 
 
-# ── Gestión de usuarios (Admin + Personal) ───────────────────────────────────
 @admin_bp.route('/usuarios')
 @login_required
 @requiere_ver_pagina('usuarios')
 def usuarios():
     admins = Admin.query.order_by(Admin.documento).all()
     personal_list = Personal.query.order_by(Personal.docpersonal).all()
-    # HU-66: solicitudes de supresion pendientes (solo visibles con ver_datos_personales)
     solicitudes = (SolicitudSupresion.query
                    .order_by(SolicitudSupresion.fecha.desc())
                    .limit(30)
@@ -25,8 +23,8 @@ def usuarios():
 @login_required
 @requiere_permiso('ver_datos_personales')
 def solicitud_supresion_procesar(idsolicitud):
-    """HU-66: marca una solicitud de supresion como procesada.
-    El borrado/anonimizacion de los datos se realiza manualmente."""
+    """Marca una solicitud de supresion como procesada; el borrado o
+    anonimizacion de los datos se hace manualmente."""
     s = SolicitudSupresion.query.get_or_404(idsolicitud)
     s.estado = 'Procesada'
     db.session.commit()
@@ -36,9 +34,7 @@ def solicitud_supresion_procesar(idsolicitud):
 
 
 def _validar_password(clave):
-    """HU-17: minimo 8 caracteres, combinando letras y numeros. El
-    minlength del HTML es solo una ayuda visual, no protege nada por si
-    solo -- un request directo a la ruta lo saltaba por completo."""
+    """Minimo 8 caracteres, combinando letras y numeros."""
     if len(clave) < 8:
         return 'La contraseña debe tener al menos 8 caracteres.'
     if not any(c.isalpha() for c in clave) or not any(c.isdigit() for c in clave):
@@ -60,8 +56,6 @@ def usuario_nuevo():
         flash('Todos los campos son obligatorios.', 'danger')
         return redirect(url_for('admin_panel.usuarios'))
 
-    # HU-53: un documento no numerico ya no lanza una excepcion sin
-    # capturar (500), se rechaza con un mensaje claro.
     try:
         doc_int = int(doc)
     except ValueError:
@@ -91,8 +85,6 @@ def usuario_nuevo():
         if Admin.query.filter_by(email=email).first():
             flash('Ya existe un usuario con ese correo.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
-        # HU-53: antes solo se validaba email duplicado para admin;
-        # un documento repetido lanzaba IntegrityError sin capturar (500).
         if Admin.query.filter_by(documento=doc_int).first():
             flash('Ya existe un usuario con ese documento.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
@@ -148,7 +140,7 @@ def usuario_editar(documento):
 
 
 def _admin_tiene_historial(documento):
-    """HU-36: un admin/cajero/auditor tiene historial si registro compras,
+    """Un admin/cajero/auditor tiene historial si registro compras,
     reportes o bajas de inventario."""
     return (
         db.session.query(Compra.idcompra).filter_by(documentoadmin=documento).first() is not None or
@@ -159,7 +151,7 @@ def _admin_tiene_historial(documento):
 
 
 def _personal_tiene_historial(docpersonal):
-    """HU-36: personal tiene historial si registro bajas de inventario."""
+    """Personal tiene historial si registro bajas de inventario."""
     return db.session.query(BajaInventario.idbaja).filter_by(
         usuario_documento=docpersonal, usuario_tipo='personal').first() is not None
 
@@ -173,7 +165,6 @@ def usuario_eliminar(documento):
 
     if tipo_cuenta == 'personal':
         p = Personal.query.get_or_404(documento)
-        # HU-36: no se borra fisicamente si tiene historial asociado.
         if _personal_tiene_historial(documento):
             p.activo = False
             db.session.commit()
@@ -196,7 +187,6 @@ def usuario_eliminar(documento):
             flash('No puedes eliminar tu propio usuario.', 'danger')
             return redirect(url_for('admin_panel.usuarios'))
         admin = Admin.query.get_or_404(documento)
-        # HU-36: no se borra fisicamente si tiene historial asociado.
         if _admin_tiene_historial(documento):
             admin.activo = False
             db.session.commit()
