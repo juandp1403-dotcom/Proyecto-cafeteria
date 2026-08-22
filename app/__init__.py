@@ -217,6 +217,14 @@ def _migrar_esquema():
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)")
+        # Bug de datos encontrado en la BD real: existe una columna 'preciou'
+        # huerfana en detalleventa (NOT NULL, sin default) que no aparece en
+        # ningun lugar del codigo ni del historial de git -- quedo de una
+        # intervencion manual anterior sobre la BD. El modelo actual usa
+        # 'precio_unitario' y nunca llena 'preciou', asi que bloqueaba
+        # CUALQUIER insert nuevo en detalleventa (ej. HU-49: confirmar
+        # pedido del cliente devolvia 500 en produccion).
+        _ejecutar_migracion("ALTER TABLE detalleventa ALTER COLUMN preciou DROP NOT NULL")
 
     # ── Columnas agregadas en cambios anteriores (ambos motores) ──
     agregar_columna('producto', 'imagen',
