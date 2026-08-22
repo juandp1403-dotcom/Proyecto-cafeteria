@@ -1,8 +1,8 @@
 from flask import render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from models import db, Producto, Compra, DetalleCompra, ajustar_stock
-from blueprints.permisos import requiere_permiso, requiere_ver_pagina
-from utils import hoy_bogota
+from ...models import db, Producto, Compra, DetalleCompra, ajustar_stock
+from ..permisos import requiere_permiso, requiere_ver_pagina
+from ...utils import hoy_bogota
 from . import admin_bp
 
 

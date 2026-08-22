@@ -15,7 +15,7 @@ os.environ.pop('SMTP_HOST', None)  # sin SMTP configurado: solo se loguea
 import pytest
 
 from app import create_app
-from models import db, Admin, crear_token_recuperacion, validar_token_recuperacion, TokenRecuperacion
+from app.models import db, Admin, crear_token_recuperacion, validar_token_recuperacion, TokenRecuperacion
 from werkzeug.security import generate_password_hash
 
 

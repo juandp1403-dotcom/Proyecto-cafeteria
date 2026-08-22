@@ -17,8 +17,8 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db, Admin, Personal
-from blueprints.permisos import PERMISOS
+from app.models import db, Admin, Personal
+from app.blueprints.permisos import PERMISOS
 from werkzeug.security import generate_password_hash
 
 CREDENCIALES = {

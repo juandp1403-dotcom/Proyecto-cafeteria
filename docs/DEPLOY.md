@@ -12,7 +12,7 @@ antes de cada despliegue a producción:
 - [ ] `SSH_HOST_KEY` configurada si se usa túnel SSH — ver sección
       correspondiente más abajo.
 - [ ] Contraseñas de las cuentas admin/cajero/despachador NO son las
-      de ejemplo del `.env.example` (`Admin123`, etc.).
+      de ejemplo del `config/.env.example` (`Admin123`, etc.).
 - [ ] HTTPS activo de punta a punta: el dominio responde por HTTPS
       (lo maneja Coolify/el proxy reverso) y `X-Forwarded-Proto` llega
       correctamente para que `Strict-Transport-Security` se emita.
@@ -21,7 +21,7 @@ antes de cada despliegue a producción:
       que exista, cualquiera que vaya a correr una migración de
       esquema debe sacar un dump manual primero.
 - [ ] Los tests pasan (`pytest tests/`) y el lint no tiene errores
-      (`ruff check .`) antes de fusionar a `main`.
+      (`ruff check --config config/ruff.toml .`) antes de fusionar a `main`.
 - [ ] Se revisó qué cambia en la base de datos con este despliegue
       (ver `7-historias_base_datos_guia.docx` si aplica) y quién lo
       va a aplicar.
@@ -32,7 +32,7 @@ Antes de dar por bueno un despliegue en producción:
 
 1. Confirma que el contenedor tiene configuradas `SSH_HOST` (+ `SSH_PORT`,
    `SSH_USER`, `SSH_KEY`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`,
-   `DB_NAME`) o directamente `DATABASE_URL`. Ver `.env.example`.
+   `DB_NAME`) o directamente `DATABASE_URL`. Ver `config/.env.example`.
 2. Revisa los logs de arranque: si aparece `[tunel SSH] Conectado a ...`,
    el túnel se abrió correctamente.
 3. Si falta la configuración, la app ahora **no arranca** en producción —
@@ -68,14 +68,14 @@ volumen persistente, cada redeploy del contenedor borra las imágenes
 subidas por el equipo.
 
 En Coolify (o el orquestador que se use), monta un volumen para ambas
-rutas, por ejemplo en `docker-compose.yml`:
+rutas, por ejemplo en `docker/docker-compose.yml`:
 
 ```yaml
 services:
   web:
     volumes:
-      - imagenes_productos:/app/static/imagenes
-      - imagenes_activas:/app/static/productos
+      - imagenes_productos:/app/app/static/imagenes
+      - imagenes_activas:/app/app/static/productos
 
 volumes:
   imagenes_productos:

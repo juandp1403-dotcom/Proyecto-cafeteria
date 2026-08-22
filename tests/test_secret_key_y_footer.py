@@ -22,8 +22,8 @@ def test_secret_key_por_defecto_falla_en_produccion(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', _tmp_db_url())
     monkeypatch.delenv('SECRET_KEY', raising=False)
     import importlib
-    import config
-    importlib.reload(config)  # SECRET_KEY se lee a nivel de clase
+    import config.config
+    importlib.reload(config.config)  # SECRET_KEY se lee a nivel de clase
     import app as app_module
     importlib.reload(app_module)
 
@@ -35,8 +35,8 @@ def test_secret_key_corta_falla_en_produccion(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', _tmp_db_url())
     monkeypatch.setenv('SECRET_KEY', 'corta123')
     import importlib
-    import config
-    importlib.reload(config)
+    import config.config
+    importlib.reload(config.config)
     import app as app_module
     importlib.reload(app_module)
 
@@ -48,8 +48,8 @@ def test_secret_key_valida_permite_arrancar(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', _tmp_db_url())
     monkeypatch.setenv('SECRET_KEY', 'a' * 40)
     import importlib
-    import config
-    importlib.reload(config)
+    import config.config
+    importlib.reload(config.config)
     import app as app_module
     importlib.reload(app_module)
 
@@ -61,8 +61,8 @@ def test_footer_muestra_el_anio_actual(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', _tmp_db_url())
     monkeypatch.setenv('SECRET_KEY', 'a' * 40)
     import importlib
-    import config
-    importlib.reload(config)
+    import config.config
+    importlib.reload(config.config)
     import app as app_module
     importlib.reload(app_module)
 

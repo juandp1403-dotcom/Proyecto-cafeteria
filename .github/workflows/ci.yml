@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check .
+      - run: ruff check --config config/ruff.toml .
 
   test:
     runs-on: ubuntu-latest
@@ -30,10 +30,10 @@ jobs:
       # falla el build si baja del umbral acordado en la auditoria.
       - run: >
           pytest tests/ -v
-          --cov=blueprints.cliente.routes
-          --cov=blueprints.admin.routes
-          --cov=blueprints.admin.ventas
-          --cov=blueprints.admin.productos
+          --cov=app.blueprints.cliente.routes
+          --cov=app.blueprints.admin.routes
+          --cov=app.blueprints.admin.ventas
+          --cov=app.blueprints.admin.productos
           --cov-report=term-missing
           --cov-fail-under=70
 

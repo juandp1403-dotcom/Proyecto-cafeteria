@@ -23,7 +23,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app, _ejecutar_migracion
-from models import db, Producto, Admin, Reporte
+from app.models import db, Producto, Admin, Reporte
 
 
 @pytest.fixture()
@@ -63,7 +63,7 @@ def test_reporte_to_dict_no_lanza_attributeerror(app):
 
 
 def test_venta_ya_no_tiene_to_dict_muerto():
-    from models import Venta
+    from app.models import Venta
     assert not hasattr(Venta, 'to_dict')
 
 

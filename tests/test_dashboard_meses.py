@@ -17,8 +17,8 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db
-from blueprints.admin.routes import _ultimos_12_meses
+from app.models import db
+from app.blueprints.admin.routes import _ultimos_12_meses
 from datetime import date
 
 

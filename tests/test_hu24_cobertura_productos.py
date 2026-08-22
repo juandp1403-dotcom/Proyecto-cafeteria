@@ -18,7 +18,7 @@ import pytest
 from openpyxl import Workbook, load_workbook
 
 from app import create_app
-from models import db
+from app.models import db
 
 
 @pytest.fixture()

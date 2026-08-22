@@ -22,7 +22,7 @@ def app_production(monkeypatch):
     monkeypatch.setenv('DATABASE_URL', _tmp_db_url())
     monkeypatch.setenv('SECRET_KEY', 'a' * 40)
     import importlib
-    import config as config_module
+    import config.config as config_module
     importlib.reload(config_module)
     import app as app_module
     importlib.reload(app_module)

@@ -1,9 +1,9 @@
 from flask import render_template, request, redirect, url_for, session, jsonify, flash, current_app
 from flask_login import current_user
 from sqlalchemy import func
-from models import db, expr_fecha, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
-from extensions import limiter
-from utils import ahora_bogota, hoy_bogota
+from ...models import db, expr_fecha, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
+from ...extensions import limiter
+from ...utils import ahora_bogota, hoy_bogota
 from . import cliente_bp
 
 
@@ -265,7 +265,7 @@ def cancelar_pedido(idventa):
     db.session.commit()
 
     if afectados:
-        from models import ajustar_stock
+        from ...models import ajustar_stock
         for det in detalles:
             ajustar_stock(det.idproducto, det.cantidad)
         db.session.commit()

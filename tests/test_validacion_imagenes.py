@@ -17,7 +17,7 @@ os.environ.pop('SSH_HOST', None)
 from PIL import Image
 from werkzeug.datastructures import FileStorage
 
-from blueprints.admin.productos import _es_imagen_valida, MAX_IMAGE_DIMENSION
+from app.blueprints.admin.productos import _es_imagen_valida, MAX_IMAGE_DIMENSION
 
 
 def _png_bytes(width, height):

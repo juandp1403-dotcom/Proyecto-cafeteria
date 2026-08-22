@@ -4,9 +4,9 @@ from PIL import Image
 import os
 import shutil
 import uuid
-from models import db, Producto, BajaInventario, ajustar_stock, registrar_auditoria
-from blueprints.permisos import requiere_permiso, requiere_ver_pagina
-from utils import ahora_bogota
+from ...models import db, Producto, BajaInventario, ajustar_stock, registrar_auditoria
+from ..permisos import requiere_permiso, requiere_ver_pagina
+from ...utils import ahora_bogota
 from . import admin_bp
 
 

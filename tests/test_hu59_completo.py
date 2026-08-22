@@ -14,7 +14,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db, Personal
+from app.models import db, Personal
 from werkzeug.security import generate_password_hash
 
 

@@ -24,7 +24,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db, Cliente, Venta
+from app.models import db, Cliente, Venta
 
 
 @pytest.fixture()
@@ -101,7 +101,7 @@ def test_seed_usa_rol_despachador_no_entregador(app):
     """HU-33: el rol 'entregador' no existe en PERMISOS (queda sin permisos
     reales). El seed debe usar el valor canonico 'despachador'."""
     with app.app_context():
-        from models import Admin
+        from app.models import Admin
         cuenta = Admin.query.filter_by(email='entregador@cafeteria.com').first()
         assert cuenta is not None
         assert cuenta.rol == 'despachador'

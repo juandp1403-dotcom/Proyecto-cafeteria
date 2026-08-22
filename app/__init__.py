@@ -7,9 +7,9 @@ from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
 from werkzeug.middleware.proxy_fix import ProxyFix
-from config import config, _abrir_tunel, _construir_db_url
-from models import db, Admin, Personal
-from extensions import limiter
+from config.config import config, _abrir_tunel, _construir_db_url
+from .models import db, Admin, Personal
+from .extensions import limiter
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
@@ -90,10 +90,10 @@ def create_app(config_name='default'):
         app.logger.handlers = [handler]
         app.logger.setLevel(logging.INFO)
 
-    from blueprints.cliente   import cliente_bp
-    from blueprints.empleados import empleados_bp
-    from blueprints.admin     import admin_bp
-    from blueprints.permisos  import registrar_context_processor
+    from .blueprints.cliente   import cliente_bp
+    from .blueprints.empleados import empleados_bp
+    from .blueprints.admin     import admin_bp
+    from .blueprints.permisos  import registrar_context_processor
 
     app.register_blueprint(cliente_bp)
     app.register_blueprint(empleados_bp)
@@ -333,7 +333,7 @@ def _clave_seed(env_var, default_dev, config_name):
 
 
 def _seed_datos_iniciales(config_name='development'):
-    from models import Admin, Producto
+    from .models import Admin, Producto
     from werkzeug.security import generate_password_hash
 
     documentos_existentes = {a.documento for a in Admin.query.with_entities(Admin.documento).all()}

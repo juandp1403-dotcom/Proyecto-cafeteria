@@ -13,7 +13,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db
+from app.models import db
 
 
 @pytest.fixture()

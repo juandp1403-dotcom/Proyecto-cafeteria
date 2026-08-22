@@ -1,7 +1,7 @@
 from flask import render_template, request
 from flask_login import login_required
-from models import RegistroAuditoria
-from blueprints.permisos import requiere_ver_pagina
+from ...models import RegistroAuditoria
+from ..permisos import requiere_ver_pagina
 from . import admin_bp
 
 

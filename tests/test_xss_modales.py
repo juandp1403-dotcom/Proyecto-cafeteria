@@ -15,7 +15,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db, Producto
+from app.models import db, Producto
 
 PAYLOAD = """Cafe');alert(document.cookie);//' "></button><script>alert(1)</script>"""
 
@@ -63,7 +63,7 @@ def test_nombre_producto_malicioso_no_rompe_el_onclick(app, client):
 
 def test_nombre_usuario_malicioso_no_rompe_el_onclick(app, client):
     with app.app_context():
-        from models import Admin
+        from app.models import Admin
         from werkzeug.security import generate_password_hash
         db.session.add(Admin(
             documento=5555555,

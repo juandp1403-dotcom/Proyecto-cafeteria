@@ -8,7 +8,7 @@ import pytest
 
 os.environ.pop('SSH_HOST_KEY', None)
 
-import config
+import config.config as config
 
 
 def test_sin_ssh_host_key_falla_explicito_en_produccion(monkeypatch):

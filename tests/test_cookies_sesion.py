@@ -15,7 +15,7 @@ os.environ.pop('SSH_HOST', None)
 
 import pytest
 
-from models import db
+from app.models import db
 
 
 @pytest.fixture()
@@ -24,7 +24,7 @@ def app_production():
     # modulo puede haber quedado cacheado por otro test que lo importo
     # antes de que fijaramos la variable de entorno aqui arriba.
     import importlib
-    import config as config_module
+    import config.config as config_module
     importlib.reload(config_module)
     import app as app_module
     importlib.reload(app_module)

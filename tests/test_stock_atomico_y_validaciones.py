@@ -17,7 +17,7 @@ os.environ.pop('SSH_HOST', None)
 import pytest
 
 from app import create_app
-from models import db, Producto, Cliente, Venta, DetalleVenta, ajustar_stock
+from app.models import db, Producto, Cliente, Venta, DetalleVenta, ajustar_stock
 
 
 @pytest.fixture()

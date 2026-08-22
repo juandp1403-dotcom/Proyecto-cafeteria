@@ -1,12 +1,12 @@
 from flask import render_template, redirect, url_for, request, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import (
+from ...models import (
     db, Admin, Personal, registrar_auditoria,
     crear_token_recuperacion, validar_token_recuperacion,
 )
-from extensions import limiter
-from correo import enviar_correo
+from ...extensions import limiter
+from ...correo import enviar_correo
 from . import empleados_bp
 
 # HU-52: hash dummy fijo para igualar el tiempo de respuesta cuando el

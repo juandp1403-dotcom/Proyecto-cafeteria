@@ -1,9 +1,9 @@
 from flask import render_template
 from flask_login import login_required
 from datetime import timedelta
-from models import db, expr_fecha, Producto, Venta, DetalleVenta
-from blueprints.permisos import requiere_ver_pagina
-from utils import hoy_bogota
+from ...models import db, expr_fecha, Producto, Venta, DetalleVenta
+from ..permisos import requiere_ver_pagina
+from ...utils import hoy_bogota
 from . import admin_bp
 
 

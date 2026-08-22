@@ -1,9 +1,9 @@
 from flask import render_template, redirect, url_for, request, flash, send_file
 from flask_login import login_required, current_user
 from datetime import datetime
-from models import db, Producto, Admin, Reporte
-from blueprints.permisos import requiere_permiso, requiere_ver_pagina
-from utils import ahora_bogota, hoy_bogota
+from ...models import db, Producto, Admin, Reporte
+from ..permisos import requiere_permiso, requiere_ver_pagina
+from ...utils import ahora_bogota, hoy_bogota
 from . import admin_bp
 
 

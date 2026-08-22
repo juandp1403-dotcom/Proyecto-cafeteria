@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from models import db, Admin, Personal, Compra, Reporte, BajaInventario, SolicitudSupresion, registrar_auditoria
-from blueprints.permisos import requiere_permiso, requiere_ver_pagina
+from ...models import db, Admin, Personal, Compra, Reporte, BajaInventario, SolicitudSupresion, registrar_auditoria
+from ..permisos import requiere_permiso, requiere_ver_pagina
 from . import admin_bp
 
 
