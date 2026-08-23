@@ -75,7 +75,7 @@ def registro():
 
         session['cliente_doc']    = doc
         session['cliente_nombre'] = nombre
-        return redirect(url_for('cliente.catalogo'))
+        return redirect(url_for('cliente.ordenar'))
 
     return render_template('cliente/registro.html')
 
@@ -351,6 +351,6 @@ def supresion():
         db.session.add(solicitud)
         db.session.commit()
         flash('Tu solicitud de supresión fue registrada. El administrador la procesará y te contactará si es necesario.', 'success')
-        return redirect(url_for('cliente.catalogo'))
+        return redirect(url_for('cliente.ordenar'))
 
     return render_template('cliente/supresion.html')
