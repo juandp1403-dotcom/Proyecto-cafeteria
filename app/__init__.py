@@ -182,6 +182,20 @@ def _migrar_esquema():
         # 'preciou' es una columna huerfana en la BD real (no existe en el
         # modelo ni en el historial de git); bloqueaba cualquier insert nuevo.
         _ejecutar_migracion("ALTER TABLE detalleventa ALTER COLUMN preciou DROP NOT NULL")
+        # Race condition entre workers de gunicorn al sembrar el catalogo
+        # (ver _seed_catalogo_categorizado) dejo productos duplicados por
+        # nombre en la BD real. Se borra el duplicado mas reciente de
+        # cada par antes de poner el indice unico que evita que vuelva a pasar.
+        _ejecutar_migracion("""
+            DELETE FROM producto p1
+            USING producto p2
+            WHERE p1.idproducto > p2.idproducto AND p1.nombre = p2.nombre
+        """)
+
+    # Indice unico (sintaxis portable Postgres/SQLite) para que la
+    # restriccion la aplique la BD, no una lectura-y-escritura en Python
+    # que puede pisarse entre workers concurrentes.
+    _ejecutar_migracion("CREATE UNIQUE INDEX IF NOT EXISTS idx_producto_nombre_unico ON producto (nombre)")
 
     agregar_columna('producto', 'imagen',
                     "ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)",
@@ -343,7 +357,11 @@ def _seed_datos_iniciales(config_name='development'):
         ]
         db.session.add_all(productos)
 
-    db.session.commit()
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
 
 
 # Los productos legacy (Almuerzo Completo, Sanduche de Pollo, etc.) se
@@ -353,8 +371,12 @@ def _seed_datos_iniciales(config_name='development'):
 
 def _seed_catalogo_categorizado():
     """Inserta el catalogo de 2 productos por categoria si aun no
-    existen (identificados por nombre, para no duplicar en cada
-    arranque ni sobre lo que el admin ya haya editado)."""
+    existen. Commit individual por item (no uno solo al final): con
+    varios workers de gunicorn arrancando a la vez, la unica fuente de
+    verdad real es la restriccion UNIQUE de producto.nombre en la BD
+    -- el chequeo previo por nombre es solo para evitar una consulta
+    redundante, no para prevenir la condicion de carrera."""
+    from sqlalchemy.exc import IntegrityError
     from .catalogo_seed import CATALOGO_SEED
     from .models import Producto
 
@@ -367,8 +389,10 @@ def _seed_catalogo_categorizado():
             precio=item['precio'], costo=item['costo'], stock=item['stock'],
             descripcion=item['descripcion'], imagen=item['imagen'],
         ))
-
-    db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
 
 
 if __name__ == '__main__':
