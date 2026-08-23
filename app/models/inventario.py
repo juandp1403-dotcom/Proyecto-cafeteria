@@ -1,4 +1,4 @@
-from ..utils import hoy_bogota
+from ..utils import ahora_bogota
 from .base import db
 from .usuario import Admin, Personal
 
@@ -10,7 +10,9 @@ class BajaInventario(db.Model):
     cantidad   = db.Column(db.Integer, nullable=False)
     motivo     = db.Column(db.String(255), nullable=False)
     categoria  = db.Column(db.String(20), nullable=False, default='Otro')
-    fecha      = db.Column(db.Date, default=hoy_bogota)
+    # Timestamp completo: permite mostrar fecha y hora por separado.
+    # Filas legacy (tipo DATE) quedan con hora 00:00; ver _migrar_esquema.
+    fecha      = db.Column(db.DateTime, default=ahora_bogota)
     # Admin o Personal; sin FK por ser tablas distintas.
     usuario_documento = db.Column(db.Integer, nullable=True)
     usuario_tipo      = db.Column(db.String(20), nullable=True)  # 'admin' | 'personal'

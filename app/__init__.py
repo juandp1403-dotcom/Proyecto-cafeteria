@@ -165,6 +165,11 @@ def _migrar_esquema():
     if es_pg:
         _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)")
         _ejecutar_migracion("ALTER TABLE venta ALTER COLUMN fechaventa TYPE TIMESTAMP USING fechaventa::timestamp")
+        # Bajas de inventario y compras pasaron de DATE a TIMESTAMP (fecha
+        # y hora); en SQLite no hace falta DDL (tipado dinamico) y las
+        # filas legacy quedan con hora 00:00.
+        _ejecutar_migracion("ALTER TABLE bajainventario ALTER COLUMN fecha TYPE TIMESTAMP USING fecha::timestamp")
+        _ejecutar_migracion("ALTER TABLE compra ALTER COLUMN fechacompra TYPE TIMESTAMP USING fechacompra::timestamp")
         _ejecutar_migracion("UPDATE admin SET rol = 'despachador' WHERE rol = 'entregador'")
         _ejecutar_migracion("ALTER TABLE producto ALTER COLUMN nombre TYPE VARCHAR(100)")
         _ejecutar_migracion("ALTER TABLE cliente ALTER COLUMN nombre TYPE VARCHAR(100)")
@@ -242,6 +247,11 @@ def _migrar_esquema():
         'detalleventa', 'precio_unitario',
         "ALTER TABLE detalleventa ADD COLUMN IF NOT EXISTS precio_unitario INT NOT NULL DEFAULT 0",
         "ALTER TABLE detalleventa ADD COLUMN precio_unitario INT NOT NULL DEFAULT 0",
+    )
+    agregar_columna(
+        'detallecompra', 'subtotal',
+        "ALTER TABLE detallecompra ADD COLUMN IF NOT EXISTS subtotal INT NOT NULL DEFAULT 0",
+        "ALTER TABLE detallecompra ADD COLUMN subtotal INT NOT NULL DEFAULT 0",
     )
     # Backfill de filas legacy con el precio actual del producto.
     _ejecutar_migracion(

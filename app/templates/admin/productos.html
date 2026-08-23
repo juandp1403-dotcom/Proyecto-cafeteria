@@ -114,10 +114,20 @@
   </div>
 
   <!-- HU-62: Bajas de inventario con auditoria (quien y cuando) -->
-  {% if bajas_recientes %}
   <div class="card mt-3">
-    <div class="card-header-sena">
-      <i class="bi bi-box-arrow-down me-2"></i>Bajas de Inventario (últimas {{ bajas_recientes|length }})
+    <div class="card-header-sena d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span>
+        <i class="bi bi-box-arrow-down me-2"></i>Bajas de Inventario{% if bajas_recientes %} (últimas {{ bajas_recientes|length }}){% endif %}
+      </span>
+      <div class="d-flex gap-2">
+        <a href="{{ url_for('admin_panel.productos_bajas_excel') }}" class="btn btn-outline-success btn-sm">
+          <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel (última semana)
+        </a>
+        <a href="{{ url_for('admin_panel.productos_bajas_excel', desde=semana_lunes, hasta=semana_viernes) }}"
+           class="btn btn-outline-success btn-sm">
+          <i class="bi bi-file-earmark-excel me-1"></i>Semana Laboral (Lun-Vie)
+        </a>
+      </div>
     </div>
     <div class="card-body p-0">
       <table class="table table-sm table-sena mb-0">
@@ -130,15 +140,18 @@
             <td>{{ b.motivo }}</td>
             <td class="small text-muted">
               Registrado por: <strong>{{ b.usuario_nombre or 'Desconocido' }}</strong>
-              el {{ b.fecha.strftime('%d/%m/%Y') if b.fecha else '–' }}
+              {% if b.fecha %}
+              el {{ b.fecha.strftime('%d/%m/%Y') }} a las {{ b.fecha.strftime('%H:%M') }}
+              {% else %}–{% endif %}
             </td>
           </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-3">Sin bajas de inventario registradas</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
-  {% endif %}
 </div>
 
 {% if puede('escribir_todo') %}

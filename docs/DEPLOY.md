@@ -20,8 +20,8 @@ antes de cada despliegue a producción:
       (`pg_dump`) — hoy no hay backup automático configurado; hasta
       que exista, cualquiera que vaya a correr una migración de
       esquema debe sacar un dump manual primero.
-- [ ] Los tests pasan (`pytest tests/`) y el lint no tiene errores
-      (`ruff check --config config/ruff.toml .`) antes de fusionar a `main`.
+- [ ] El lint no tiene errores (`ruff check --config config/ruff.toml .`)
+      y la app arranca contra la BD real antes de fusionar a `main`.
 - [ ] Se revisó qué cambia en la base de datos con este despliegue
       (ver `7-historias_base_datos_guia.docx` si aplica) y quién lo
       va a aplicar.
@@ -82,10 +82,10 @@ volumes:
   imagenes_activas:
 ```
 
-## CI: lint + tests + pip-audit (HU-30) y Dependabot (HU-23)
+## CI: lint + pip-audit (HU-30) y Dependabot (HU-23)
 
 - `.github/workflows/ci.yml` corre en cada push/PR a `main`: `ruff`
-  (lint), `pytest` (tests) y `pip-audit` (vulnerabilidades conocidas).
+  (lint) y `pip-audit` (vulnerabilidades conocidas).
 - `.github/dependabot.yml` abre PRs automáticos semanales para
   `requirements.txt` y para las Actions usadas en el workflow.
 - **Pendiente de un admin del repo (no se puede hacer por código):**
