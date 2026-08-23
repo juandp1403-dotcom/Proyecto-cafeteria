@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from PIL import Image
 import os
 import shutil
+import unicodedata
 import uuid
 from ...models import db, expr_fecha, Producto, BajaInventario, ajustar_stock, registrar_auditoria
 from ...models.producto import CATEGORIAS
@@ -314,13 +315,42 @@ def _parsear_valor_numerico(valor, minimo=0, permitir_none=False):
     return numero
 
 
+def _normalizar(texto):
+    """Minusculas, sin tildes, sin espacios/guiones extra, para poder
+    comparar encabezados escritos de formas distintas ('Stock Mínimo',
+    'stock_minimo', 'Stock Minimo' deben ser la misma columna)."""
+    texto = str(texto or '').strip().lower()
+    texto = unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
+    texto = texto.replace('($)', '').replace('(', '').replace(')', '')
+    texto = texto.strip().replace(' ', '_').replace('-', '_')
+    while '__' in texto:
+        texto = texto.replace('__', '_')
+    return texto.strip('_')
+
+
+ALIAS_COLUMNAS = {
+    'producto': 'nombre',
+    'nombre': 'nombre',
+    'nombre_producto': 'nombre',
+    'precio': 'precio',
+    'precio_venta': 'precio',
+    'costo': 'costo',
+    'costo_unitario': 'costo',
+    'stock': 'stock',
+    'stock_actual': 'stock',
+    'stock_minimo': 'stock_minimo',
+    'stock_min': 'stock_minimo',
+}
+
+
 @admin_bp.route('/productos/importar', methods=['GET', 'POST'])
 @login_required
 @requiere_permiso('escribir_todo')
 def productos_importar():
     """Carga masiva de productos desde un Excel. Columnas reconocidas
-    por nombre de encabezado (no por posicion): nombre, precio, costo,
-    stock, stock_minimo. Si el nombre ya existe (comparacion insensible
+    por nombre de encabezado (no por posicion), con alias flexibles para
+    aceptar tambien el formato del exportador ('Producto', 'Precio ($)',
+    'Stock Mínimo'...). Si el nombre ya existe (comparacion insensible
     a mayusculas), se ACTUALIZA ese producto; si no, se crea uno nuevo."""
     if request.method == 'GET':
         return render_template('admin/productos_importar.html')
@@ -349,13 +379,15 @@ def productos_importar():
         flash('El archivo esta vacio.', 'danger')
         return redirect(url_for('admin_panel.productos_importar'))
 
-    def _normalizar(texto):
-        return str(texto or '').strip().lower()
-
-    columnas = {_normalizar(v): i for i, v in enumerate(encabezados) if v is not None}
-    columnas_esperadas = {'nombre', 'precio', 'costo', 'stock', 'stock_minimo'}
+    columnas = {}
+    for i, v in enumerate(encabezados):
+        if v is None:
+            continue
+        clave = ALIAS_COLUMNAS.get(_normalizar(v))
+        if clave and clave not in columnas:  # la primera columna que matchea gana
+            columnas[clave] = i
     if 'nombre' not in columnas or 'precio' not in columnas:
-        flash("El Excel debe tener al menos las columnas 'nombre' y 'precio' en la primera fila.", 'danger')
+        flash("El Excel debe tener al menos las columnas 'nombre' y 'precio' (o 'Producto' y 'Precio ($)').", 'danger')
         return redirect(url_for('admin_panel.productos_importar'))
 
     productos_por_nombre = {
@@ -372,6 +404,10 @@ def productos_importar():
         nombre = str(fila[columnas['nombre']] or '').strip()
         if not nombre:
             errores.append(f'Fila {num_fila}: falta el nombre, se omite.')
+            continue
+        # El exportador agrega una fila de totales; re-importarla crearia
+        # un producto basura "TOTAL".
+        if nombre.lower() == 'total':
             continue
         try:
             precio = _parsear_valor_numerico(fila[columnas['precio']], minimo=0)
@@ -405,7 +441,12 @@ def productos_importar():
 
     db.session.commit()
 
-    columnas_ignoradas = set(columnas.keys()) - columnas_esperadas
+    # columnas ya guarda claves canonicas: las ignoradas se reportan
+    # desde los encabezados crudos que no mapearon a nada.
+    columnas_ignoradas = {
+        str(v) for v in encabezados
+        if v is not None and ALIAS_COLUMNAS.get(_normalizar(v)) is None
+    }
     resumen = f'Importacion completa: {creados} producto(s) creado(s), {actualizados} actualizado(s).'
     if columnas_ignoradas:
         resumen += f' Columnas no reconocidas e ignoradas: {", ".join(sorted(columnas_ignoradas))}.'
