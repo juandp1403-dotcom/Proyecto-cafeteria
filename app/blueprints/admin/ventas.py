@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, request, send_file, flash
+from flask import render_template, redirect, url_for, request, send_file, flash, jsonify
 from flask_login import login_required
 from datetime import datetime, timedelta
 from ...models import db, expr_fecha, Venta, DetalleVenta, ajustar_stock
@@ -37,11 +37,28 @@ def ventas():
     semana_lunes = hoy - timedelta(days=hoy.weekday())
     semana_viernes = semana_lunes + timedelta(days=4)
 
+    # La lista viene ascendente: el id mas alto de la pagina puede estar
+    # en cualquier posicion, no en items[0].
+    ultimo_id = max((v.idventa for v in ventas.items), default=0)
+
     return render_template(
-        'admin/ventas.html', ventas=ventas, periodo=periodo,
+        'admin/ventas.html', ventas=ventas, periodo=periodo, ultimo_id=ultimo_id,
         semana_lunes=semana_lunes.strftime('%Y-%m-%d'),
         semana_viernes=semana_viernes.strftime('%Y-%m-%d'),
     )
+
+
+@admin_bp.route('/ventas/ultimo/json')
+@login_required
+@requiere_ver_pagina('ventas')
+def ventas_ultimo_json():
+    """Endpoint liviano para que la vista de ventas se auto-actualice.
+    Devuelve solo el id de la venta mas reciente que exista en el sistema
+    (sin importar el filtro de periodo que este usando la pantalla) para
+    que el frontend detecte si aparecio un pedido nuevo desde que cargo
+    la pagina."""
+    ultima = Venta.query.order_by(Venta.idventa.desc()).first()
+    return jsonify({'ultimo_id': ultima.idventa if ultima else 0})
 
 
 def _transicion_venta(idventa, estados_validos, estado_nuevo):

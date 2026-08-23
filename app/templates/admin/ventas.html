@@ -190,4 +190,34 @@
   </nav>
   {% endif %}
 </div>
+
+<script>
+// Auto-actualiza la vista de ventas cuando llega un pedido nuevo, sin
+// que el cajero tenga que recargar la pagina a mano. Mismo patron de
+// polling liviano que ya usa cliente/estado_pedido.html (HU-26).
+(function () {
+  let ultimoIdConocido = {{ ultimo_id|tojson }};
+
+  function hayModalAbierto() {
+    return document.querySelector('.modal.show') !== null;
+  }
+
+  function consultarNuevasVentas() {
+    // No interrumpas a alguien que esta llenando un formulario o modal.
+    if (hayModalAbierto() || document.hidden) return;
+
+    fetch('{{ url_for("admin_panel.ventas_ultimo_json") }}')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        if (data.ultimo_id > ultimoIdConocido) {
+          location.reload();
+        }
+      })
+      .catch(() => {});
+  }
+
+  setInterval(consultarNuevasVentas, 10000);
+})();
+</script>
 {% endblock %}
