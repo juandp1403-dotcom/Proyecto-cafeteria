@@ -376,6 +376,10 @@
               <i class="bi bi-box-arrow-right"></i>
             </button>
           </form>
+        {% elif session.get('cliente_doc') %}
+          <a href="{{ url_for('cliente.salir') }}" class="btn btn-outline-secondary btn-sm" title="Salir e ir al inicio de sesión">
+            <i class="bi bi-box-arrow-left"></i>
+          </a>
         {% endif %}
 
         <!-- Toggle de tema -->
