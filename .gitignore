@@ -11,7 +11,6 @@ server_log.txt
 server.pid
 *.pid
 .coverage
-.pytest_cache/
 
 # Imagenes subidas en tiempo de ejecucion (HU-63): no versionar contenido
 # generado en produccion, se persisten en el servidor via volumen. Las
@@ -23,3 +22,4 @@ app/static/productos/*
 !app/static/productos/.gitkeep
 !app/static/productos/cat_*
 !app/static/productos/categoria_*
+.ruff_cache/

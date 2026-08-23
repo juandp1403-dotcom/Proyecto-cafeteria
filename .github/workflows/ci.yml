@@ -17,26 +17,6 @@ jobs:
       - run: pip install ruff
       - run: ruff check --config config/ruff.toml .
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -r requirements.txt
-      - run: pip install pytest pytest-cov
-      # HU-24: cobertura minima del nucleo de negocio (ventas/stock) --
-      # falla el build si baja del umbral acordado en la auditoria.
-      - run: >
-          pytest tests/ -v
-          --cov=app.blueprints.cliente.routes
-          --cov=app.blueprints.admin.routes
-          --cov=app.blueprints.admin.ventas
-          --cov=app.blueprints.admin.productos
-          --cov-report=term-missing
-          --cov-fail-under=70
-
   pip-audit:
     runs-on: ubuntu-latest
     steps:

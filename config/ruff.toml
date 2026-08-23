@@ -8,6 +8,3 @@ select = ["E9", "F"]
 ignore = [
     "F401",  # imports sin usar -- ya hay varios conocidos, se limpian aparte (ver auditoria)
 ]
-
-[lint.per-file-ignores]
-"tests/*" = ["F401", "F841"]
