@@ -6,6 +6,22 @@ from sshtunnel import SSHTunnelForwarder
 
 load_dotenv()
 
+# sshtunnel 0.4.0 referencia paramiko.DSSKey, eliminado en paramiko 5
+# (se retiro el soporte DSA). Nunca autenticamos con claves DSA -- SSH_KEY
+# es ed25519 -- asi que basta un shim que falle explicitamente si alguien
+# intentara usar una.
+if not hasattr(paramiko, 'DSSKey'):
+    class _DSSKeyRetirado:
+        @staticmethod
+        def from_private_key_file(*_args, **_kwargs):
+            # sshtunnel prueba cada clase de llave y solo captura
+            # SSHException para pasar a la siguiente.
+            raise paramiko.SSHException(
+                'Claves DSA no soportadas: retiradas en paramiko 5. '
+                'Usa una clave ed25519 o rsa.'
+            )
+    paramiko.DSSKey = _DSSKeyRetirado
+
 _tunnel = None
 
 
