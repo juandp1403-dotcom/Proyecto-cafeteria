@@ -104,7 +104,22 @@ def registrar_context_processor(app):
             tipo_usuario_actual=tipo_usuario_actual,
             iniciales=iniciales,
             doc_enmascarado=doc_enmascarado,
+            avatar_perfil=avatar_perfil,
         )
+
+
+# Terminaciones tipicas de nombres en espanol usados en Colombia; es una
+# heuristica visual para elegir el avatar generico (hombre/mujer), no un
+# dato real de la persona -- si falla, solo cambia que dibujo se muestra.
+_TERMINACIONES_FEMENINAS = ('a', 'ia', 'ana', 'ina', 'esa', 'ela')
+
+
+def avatar_perfil(nombre):
+    """Nombre de archivo del avatar generico segun el primer nombre."""
+    primer_nombre = (str(nombre).strip().split() or [''])[0].lower()
+    if primer_nombre.endswith(_TERMINACIONES_FEMENINAS):
+        return 'perfil_mujer.png'
+    return 'perfil_hombre.png'
 
 
 def iniciales(nombre):

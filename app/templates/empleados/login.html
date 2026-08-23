@@ -6,14 +6,13 @@
   .crown-circle {
     width: 64px; height: 64px;
     border-radius: 50%;
-    border: 3px solid #FFD700;
-    background: #1a1a1a;
+    background: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 2rem;
-    color: #FFD700;
     margin: 0 auto 12px;
     box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+    overflow: hidden;
   }
+  .crown-circle img { width: 72%; height: 72%; object-fit: contain; }
 </style>
 {% endblock %}
 
@@ -22,7 +21,7 @@
   <div class="card" style="width:100%;max-width:400px">
     <div class="card-header-sena text-center">
       <div class="crown-circle">
-        <i class="bi bi-crown-fill"></i>
+        <img src="{{ url_for('static', filename='img/logo_sena.png') }}" alt="Logo SENA">
       </div>
       <h5 class="mb-0">Acceso Personal</h5>
       <small class="opacity-75">Cafetería CGAO – Admin y Empleados</small>

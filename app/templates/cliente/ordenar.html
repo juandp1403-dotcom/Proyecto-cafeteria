@@ -46,7 +46,7 @@
 <div class="container py-4" style="max-width:1100px">
   <div class="mb-4">
     <h4 class="fw-bold mb-1" style="color:var(--sena-green)">
-      <i class="bi bi-grid-3x3-gap-fill me-2"></i>Ordenar
+      <img src="{{ url_for('static', filename='img/menu_logo.png') }}" alt="" style="width:26px;height:26px;object-fit:contain;vertical-align:-6px" class="me-2">Ordenar
     </h4>
     <small class="text-muted">Elige una categoría para ver los productos disponibles</small>
   </div>
@@ -65,13 +65,6 @@
       </a>
     </div>
     {% endfor %}
-  </div>
-
-  <div class="mt-4 text-center">
-    <a href="{{ url_for('cliente.catalogo') }}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-grid-3x3-gap me-1"></i>Ver catálogo completo
-    </a>
-    <small class="d-block text-muted mt-1">Incluye productos sin categoría asignada</small>
   </div>
 </div>
 {% endblock %}
