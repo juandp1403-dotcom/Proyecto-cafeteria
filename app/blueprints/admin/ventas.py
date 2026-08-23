@@ -34,7 +34,14 @@ def ventas():
 
     ventas = query.order_by(Venta.idventa.asc()).paginate(page=page, per_page=15, error_out=False)
 
-    return render_template('admin/ventas.html', ventas=ventas, periodo=periodo)
+    semana_lunes = hoy - timedelta(days=hoy.weekday())
+    semana_viernes = semana_lunes + timedelta(days=4)
+
+    return render_template(
+        'admin/ventas.html', ventas=ventas, periodo=periodo,
+        semana_lunes=semana_lunes.strftime('%Y-%m-%d'),
+        semana_viernes=semana_viernes.strftime('%Y-%m-%d'),
+    )
 
 
 def _transicion_venta(idventa, estados_validos, estado_nuevo):
@@ -133,7 +140,7 @@ def ventas_excel():
     ws = wb.active
     ws.title = "Ventas del Dia"
 
-    headers = ['#', 'Cliente', 'Documento', 'Ficha', 'Productos', 'Valor Total', 'Estado', 'Fecha']
+    headers = ['#', 'Cliente', 'Documento', 'Ficha', 'Productos', 'Valor Total', 'Estado', 'Fecha', 'Hora']
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="39A900", end_color="39A900", fill_type="solid")
     header_align = Alignment(horizontal="center", vertical="center")
@@ -168,6 +175,7 @@ def ventas_excel():
         ws.cell(row=row_idx, column=6, value=v.precio).border = thin_border
         ws.cell(row=row_idx, column=7, value=v.estado).border = thin_border
         ws.cell(row=row_idx, column=8, value=v.fechaventa.strftime('%d/%m/%Y') if v.fechaventa else '').border = thin_border
+        ws.cell(row=row_idx, column=9, value=v.fechaventa.strftime('%H:%M') if v.fechaventa else '').border = thin_border
 
     ws.column_dimensions['A'].width = 5
     ws.column_dimensions['B'].width = 25
@@ -177,6 +185,21 @@ def ventas_excel():
     ws.column_dimensions['F'].width = 14
     ws.column_dimensions['G'].width = 18
     ws.column_dimensions['H'].width = 14
+    ws.column_dimensions['I'].width = 10
+
+    # Fila de total vendido sobre lo REALMENTE exportado en el rango.
+    fila_total = len(ventas) + 2
+    fill_total = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    font_total = Font(bold=True)
+    totales = {
+        5: 'TOTAL VENDIDO',
+        6: sum(v.precio for v in ventas),
+    }
+    for col in range(1, len(headers) + 1):
+        celda = ws.cell(row=fila_total, column=col, value=totales.get(col))
+        celda.font = font_total
+        celda.fill = fill_total
+        celda.border = thin_border
 
     buf = BytesIO()
     wb.save(buf)

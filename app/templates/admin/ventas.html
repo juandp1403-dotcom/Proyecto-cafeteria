@@ -7,9 +7,15 @@
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
       <i class="bi bi-graph-up me-2"></i>Historial de Ventas
     </h4>
-    <a href="{{ url_for('admin_panel.ventas_excel') }}" class="btn btn-outline-success btn-sm">
-      <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel del Día
-    </a>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_panel.ventas_excel') }}" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel del Día
+      </a>
+      <a href="{{ url_for('admin_panel.ventas_excel', desde=semana_lunes, hasta=semana_viernes) }}"
+         class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Semana Laboral (Lun-Vie)
+      </a>
+    </div>
   </div>
 
   <!-- Filtros de período -->
@@ -66,7 +72,8 @@
           <div class="d-flex align-items-center gap-3">
             <div class="text-end">
               <div class="fw-bold fs-5" style="color:var(--sena-green)">${{ "{:,}".format(v.precio) }}</div>
-              <small class="text-muted">{{ v.fechaventa.strftime('%d/%m/%Y') }}</small>
+              <small class="text-muted">{{ v.fechaventa.strftime('%d/%m/%Y') }}</small><br>
+              <small class="text-muted">{{ v.fechaventa.strftime('%H:%M') }}</small>
             </div>
             <span class="badge
               {% if v.estado == 'Pendiente de Pago' %}badge-pendiente

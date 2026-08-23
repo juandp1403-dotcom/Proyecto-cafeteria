@@ -7,18 +7,23 @@
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
       <i class="bi bi-truck me-2"></i>Compras / Abastecimiento
     </h4>
-    {% if puede('escribir_todo') %}
-    <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevaCompra">
-      <i class="bi bi-plus-circle me-1"></i>Registrar Compra
-    </button>
-    {% endif %}
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_panel.compras_excel') }}" class="btn btn-outline-success">
+        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel (última semana)
+      </a>
+      {% if puede('escribir_todo') %}
+      <button class="btn btn-sena" data-bs-toggle="modal" data-bs-target="#modalNuevaCompra">
+        <i class="bi bi-plus-circle me-1"></i>Registrar Compra
+      </button>
+      {% endif %}
+    </div>
   </div>
 
   <div class="table-responsive">
     <table class="table table-hover table-sena align-middle">
       <thead>
         <tr>
-          <th>ID</th><th>Vendedor</th><th>Fecha</th>
+          <th>ID</th><th>Vendedor</th><th>Fecha</th><th>Hora</th>
           <th class="text-center">Total</th><th>Registrado por</th>
         </tr>
       </thead>
@@ -28,11 +33,12 @@
           <td class="text-muted small">{{ c.idcompra }}</td>
           <td class="fw-semibold">{{ c.nombrevendedor }}</td>
           <td class="small">{{ c.fechacompra.strftime('%d/%m/%Y') if c.fechacompra else '–' }}</td>
+          <td class="small">{{ c.fechacompra.strftime('%H:%M') if c.fechacompra else '–' }}</td>
           <td class="text-center fw-semibold">${{ "{:,}".format(c.precio) }}</td>
           <td>{{ c.admin_rel.nombre if c.admin_rel else '–' }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">Sin compras registradas</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">Sin compras registradas</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -75,7 +81,7 @@
           <label class="form-label fw-semibold" for="select-producto-plantilla">Productos comprados</label>
           <div id="items-compra">
             <div class="row g-2 mb-2 item-row">
-              <div class="col-7">
+              <div class="col-6">
                 <select class="form-select" name="idproducto[]" required id="select-producto-plantilla">
                   <option value="">— Seleccionar producto —</option>
                   {% for p in productos %}
@@ -83,8 +89,11 @@
                   {% endfor %}
                 </select>
               </div>
-              <div class="col-4">
+              <div class="col-2">
                 <input type="number" class="form-control" name="cantidad[]" placeholder="Cantidad" min="1" required>
+              </div>
+              <div class="col-3">
+                <input type="number" class="form-control" name="preciolinea[]" placeholder="Precio total pagado" min="0" required>
               </div>
               <div class="col-1 d-flex align-items-center">
                 <button type="button" class="btn btn-outline-danger btn-sm" onclick="quitarFila(this)" disabled>
@@ -120,7 +129,7 @@ function agregarFila() {
   div.className = 'row g-2 mb-2 item-row';
 
   const colSelect = document.createElement('div');
-  colSelect.className = 'col-7';
+  colSelect.className = 'col-6';
   const plantilla = document.getElementById('select-producto-plantilla');
   const select = plantilla.cloneNode(true);
   select.removeAttribute('id');
@@ -128,8 +137,12 @@ function agregarFila() {
   colSelect.appendChild(select);
 
   const colCantidad = document.createElement('div');
-  colCantidad.className = 'col-4';
+  colCantidad.className = 'col-2';
   colCantidad.innerHTML = '<input type="number" class="form-control" name="cantidad[]" placeholder="Cantidad" min="1" required>';
+
+  const colPrecio = document.createElement('div');
+  colPrecio.className = 'col-3';
+  colPrecio.innerHTML = '<input type="number" class="form-control" name="preciolinea[]" placeholder="Precio total pagado" min="0" required>';
 
   const colBtn = document.createElement('div');
   colBtn.className = 'col-1 d-flex align-items-center';
@@ -137,6 +150,7 @@ function agregarFila() {
 
   div.appendChild(colSelect);
   div.appendChild(colCantidad);
+  div.appendChild(colPrecio);
   div.appendChild(colBtn);
   document.getElementById('items-compra').appendChild(div);
 }

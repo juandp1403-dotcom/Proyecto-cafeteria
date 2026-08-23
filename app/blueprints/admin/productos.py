@@ -4,10 +4,11 @@ from PIL import Image
 import os
 import shutil
 import uuid
-from ...models import db, Producto, BajaInventario, ajustar_stock, registrar_auditoria
+from ...models import db, expr_fecha, Producto, BajaInventario, ajustar_stock, registrar_auditoria
 from ...models.producto import CATEGORIAS
 from ..permisos import requiere_permiso, requiere_ver_pagina
-from ...utils import ahora_bogota
+from ...utils import ahora_bogota, hoy_bogota
+from datetime import datetime, timedelta
 from . import admin_bp
 
 
@@ -97,9 +98,14 @@ def productos():
              .order_by(BajaInventario.idbaja.desc())
              .limit(15)
              .all())
+    hoy = hoy_bogota()
+    semana_lunes = (hoy - timedelta(days=hoy.weekday())).strftime('%Y-%m-%d')
+    semana_viernes = ((hoy - timedelta(days=hoy.weekday()))
+                      + timedelta(days=4)).strftime('%Y-%m-%d')
     return render_template('admin/productos.html', productos=prods,
                            imagenes_biblioteca=imagenes, bajas_recientes=bajas,
-                           ver_inactivos=ver_inactivos, categorias_disponibles=CATEGORIAS)
+                           ver_inactivos=ver_inactivos, categorias_disponibles=CATEGORIAS,
+                           semana_lunes=semana_lunes, semana_viernes=semana_viernes)
 
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
@@ -425,7 +431,9 @@ def productos_excel():
     ws = wb.active
     ws.title = "Inventario"
 
-    headers = ['ID', 'Producto', 'Precio ($)', 'Stock', 'Estado']
+    headers = ['ID', 'Producto', 'Precio ($)', 'Costo ($)', 'Stock', 'Stock Mínimo',
+               'Estado', 'Categoría', 'Subcategoría', 'Descripción', 'Es Especial',
+               'Especial Hasta', 'Creado', 'Actualizado', 'Activo']
     header_font = Font(bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
     header_align = Alignment(horizontal="center", vertical="center")
@@ -445,14 +453,53 @@ def productos_excel():
         ws.cell(row=row_idx, column=1, value=p.idproducto).border = thin_border
         ws.cell(row=row_idx, column=2, value=p.nombre).border = thin_border
         ws.cell(row=row_idx, column=3, value=p.precio).border = thin_border
-        ws.cell(row=row_idx, column=4, value=p.stock).border = thin_border
-        ws.cell(row=row_idx, column=5, value=p.estado).border = thin_border
+        ws.cell(row=row_idx, column=4, value=p.costo).border = thin_border
+        ws.cell(row=row_idx, column=5, value=p.stock).border = thin_border
+        ws.cell(row=row_idx, column=6, value=p.stock_minimo).border = thin_border
+        ws.cell(row=row_idx, column=7, value=p.estado).border = thin_border
+        ws.cell(row=row_idx, column=8, value=p.categoria or '').border = thin_border
+        ws.cell(row=row_idx, column=9, value=p.subcategoria or '').border = thin_border
+        ws.cell(row=row_idx, column=10, value=p.descripcion or '').border = thin_border
+        ws.cell(row=row_idx, column=11, value='Sí' if p.es_especial else 'No').border = thin_border
+        ws.cell(row=row_idx, column=12,
+                value=p.especial_hasta.strftime('%d/%m/%Y') if p.especial_hasta else '').border = thin_border
+        ws.cell(row=row_idx, column=13,
+                value=p.created_at.strftime('%d/%m/%Y %H:%M') if p.created_at else '').border = thin_border
+        ws.cell(row=row_idx, column=14,
+                value=p.updated_at.strftime('%d/%m/%Y %H:%M') if p.updated_at else '').border = thin_border
+        ws.cell(row=row_idx, column=15, value='Sí' if p.activo else 'No').border = thin_border
 
     ws.column_dimensions['A'].width = 8
     ws.column_dimensions['B'].width = 30
     ws.column_dimensions['C'].width = 14
-    ws.column_dimensions['D'].width = 10
-    ws.column_dimensions['E'].width = 16
+    ws.column_dimensions['D'].width = 14
+    ws.column_dimensions['E'].width = 10
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 16
+    ws.column_dimensions['H'].width = 16
+    ws.column_dimensions['I'].width = 16
+    ws.column_dimensions['J'].width = 35
+    ws.column_dimensions['K'].width = 12
+    ws.column_dimensions['L'].width = 16
+    ws.column_dimensions['M'].width = 18
+    ws.column_dimensions['N'].width = 18
+    ws.column_dimensions['O'].width = 10
+
+    # Fila de totales sobre lo REALMENTE exportado (el query ya excluye
+    # inactivos): valor del inventario a precio y a costo.
+    fila_total = len(productos) + 2
+    fill_total = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    font_total = Font(bold=True)
+    totales = {
+        2: 'TOTAL',
+        3: sum(p.precio * p.stock for p in productos),
+        4: sum(p.costo * p.stock for p in productos),
+    }
+    for col in range(1, len(headers) + 1):
+        celda = ws.cell(row=fila_total, column=col, value=totales.get(col))
+        celda.font = font_total
+        celda.fill = fill_total
+        celda.border = thin_border
 
     buf = BytesIO()
     wb.save(buf)
@@ -460,4 +507,100 @@ def productos_excel():
     fecha = ahora_bogota().strftime('%Y-%m-%d_%H-%M')
     return send_file(buf, as_attachment=True,
                      download_name=f"inventario_{fecha}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@admin_bp.route('/productos/bajas/excel')
+@login_required
+@requiere_ver_pagina('productos')
+def productos_bajas_excel():
+    """Excel de bajas de inventario de la ultima semana (o del rango
+    ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD si se pasa)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from io import BytesIO
+
+    # Rango opcional; por defecto los ultimos 7 dias. Un rango invalido
+    # nunca debe romper la respuesta: cae al default.
+    MAX_FILAS_EXCEL = 5000
+    desde_str = request.args.get('desde')
+    hasta_str = request.args.get('hasta')
+    hoy = hoy_bogota()
+    try:
+        desde = datetime.strptime(desde_str, '%Y-%m-%d').date() if desde_str \
+            else hoy - timedelta(days=6)
+        hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date() if hasta_str else hoy
+    except ValueError:
+        desde, hasta = hoy - timedelta(days=6), hoy
+
+    bajas = (BajaInventario.query
+             .options(db.joinedload(BajaInventario.producto))
+             .filter(expr_fecha(BajaInventario.fecha) >= desde,
+                     expr_fecha(BajaInventario.fecha) <= hasta)
+             .order_by(BajaInventario.idbaja.asc())
+             .limit(MAX_FILAS_EXCEL)
+             .all())
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Bajas de Inventario"
+
+    headers = ['ID Baja', 'Producto', 'Cantidad', 'Motivo', 'Categoría', 'Fecha', 'Hora', 'Usuario']
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="39A900", end_color="39A900", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    for row_idx, b in enumerate(bajas, 2):
+        ws.cell(row=row_idx, column=1, value=b.idbaja).border = thin_border
+        ws.cell(row=row_idx, column=2,
+                value=b.producto.nombre if b.producto else '').border = thin_border
+        ws.cell(row=row_idx, column=3, value=b.cantidad).border = thin_border
+        ws.cell(row=row_idx, column=4, value=b.motivo).border = thin_border
+        ws.cell(row=row_idx, column=5, value=b.categoria or '').border = thin_border
+        ws.cell(row=row_idx, column=6,
+                value=b.fecha.strftime('%d/%m/%Y') if b.fecha else '').border = thin_border
+        ws.cell(row=row_idx, column=7,
+                value=b.fecha.strftime('%H:%M') if b.fecha else '').border = thin_border
+        ws.cell(row=row_idx, column=8, value=b.usuario_nombre or '').border = thin_border
+
+    ws.column_dimensions['A'].width = 10
+    ws.column_dimensions['B'].width = 30
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 20
+    ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 10
+    ws.column_dimensions['H'].width = 25
+
+    # Fila de total de unidades dadas de baja (consistente con lo exportado).
+    fila_total = len(bajas) + 2
+    fill_total = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    font_total = Font(bold=True)
+    totales = {
+        2: 'TOTAL UNIDADES DE BAJA',
+        3: sum(b.cantidad for b in bajas),
+    }
+    for col in range(1, len(headers) + 1):
+        celda = ws.cell(row=fila_total, column=col, value=totales.get(col))
+        celda.font = font_total
+        celda.fill = fill_total
+        celda.border = thin_border
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fecha = ahora_bogota().strftime('%Y-%m-%d')
+    return send_file(buf, as_attachment=True,
+                     download_name=f"bajas_inventario_{fecha}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

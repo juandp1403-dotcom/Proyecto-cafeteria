@@ -9,7 +9,7 @@
     </h4>
     <div class="d-flex gap-2">
       <a href="{{ url_for('admin_panel.reportes_excel') }}" class="btn btn-outline-success btn-sm">
-        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
+        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel del Día
       </a>
       {% if puede('generar_reporte') %}
       <button class="btn btn-sena btn-sm" data-bs-toggle="modal" data-bs-target="#modalCrearReporte">
@@ -17,6 +17,22 @@
       </button>
       {% endif %}
     </div>
+  </div>
+
+  <!-- Filtros de período -->
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <a href="{{ url_for('admin_panel.reportes', periodo='todos') }}"
+       class="btn btn-sm {% if periodo == 'todos' %}btn-sena{% else %}btn-outline-secondary{% endif %}">
+      <i class="bi bi-list-ul me-1"></i>Todos
+    </a>
+    <a href="{{ url_for('admin_panel.reportes', periodo='dia') }}"
+       class="btn btn-sm {% if periodo == 'dia' %}btn-sena{% else %}btn-outline-secondary{% endif %}">
+      <i class="bi bi-calendar-day me-1"></i>Diarios
+    </a>
+    <a href="{{ url_for('admin_panel.reportes', periodo='semana') }}"
+       class="btn btn-sm {% if periodo == 'semana' %}btn-sena{% else %}btn-outline-secondary{% endif %}">
+      <i class="bi bi-calendar-week me-1"></i>Semanales
+    </a>
   </div>
 
   <!-- Lista de reportes -->
@@ -51,7 +67,7 @@
     {% else %}
     <div class="text-center text-muted py-5">
       <i class="bi bi-inbox" style="font-size:3rem"></i>
-      <p class="mt-2">No hay reportes registrados.</p>
+      <p class="mt-2">No hay reportes registrados{% if periodo != 'todos' %} en este período{% endif %}.</p>
     </div>
     {% endfor %}
   </div>
@@ -62,13 +78,13 @@
     <ul class="pagination justify-content-center">
       {% if reportes.has_prev %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ reportes.prev_num }}">&laquo;</a>
+          <a class="page-link" href="?page={{ reportes.prev_num }}&periodo={{ periodo }}">&laquo;</a>
         </li>
       {% endif %}
       {% for page in reportes.iter_pages() %}
         {% if page %}
           <li class="page-item {% if page == reportes.page %}active{% endif %}">
-            <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+            <a class="page-link" href="?page={{ page }}&periodo={{ periodo }}">{{ page }}</a>
           </li>
         {% else %}
           <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
@@ -76,7 +92,7 @@
       {% endfor %}
       {% if reportes.has_next %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ reportes.next_num }}">&raquo;</a>
+          <a class="page-link" href="?page={{ reportes.next_num }}&periodo={{ periodo }}">&raquo;</a>
         </li>
       {% endif %}
     </ul>

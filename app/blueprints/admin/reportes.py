@@ -1,6 +1,6 @@
 from flask import render_template, redirect, url_for, request, flash, send_file
 from flask_login import login_required, current_user
-from datetime import datetime
+from datetime import datetime, timedelta
 from ...models import db, Producto, Admin, Reporte
 from ..permisos import requiere_permiso, requiere_ver_pagina
 from ...utils import ahora_bogota, hoy_bogota
@@ -12,12 +12,23 @@ from . import admin_bp
 @requiere_ver_pagina('reportes')
 def reportes():
     page = request.args.get('page', 1, type=int)
-    reportes_q = (Reporte.query
-                  .options(db.joinedload(Reporte.prod_rel))
+    periodo = request.args.get('periodo', 'todos')
+    hoy = hoy_bogota()
+
+    query = Reporte.query.options(db.joinedload(Reporte.prod_rel))
+
+    # Reporte.fecha es db.Date: se compara directo, sin expr_fecha.
+    if periodo == 'dia':
+        query = query.filter(Reporte.fecha == hoy)
+    elif periodo == 'semana':
+        query = query.filter(Reporte.fecha >= hoy - timedelta(days=6))
+
+    reportes_q = (query
                   .order_by(Reporte.idreporte.desc())
                   .paginate(page=page, per_page=15, error_out=False))
     productos = Producto.query.filter(Producto.activo.is_(True)).order_by(Producto.nombre).all()
-    return render_template('admin/reportes.html', reportes=reportes_q, productos=productos)
+    return render_template('admin/reportes.html', reportes=reportes_q,
+                           productos=productos, periodo=periodo)
 
 
 @admin_bp.route('/reportes/crear', methods=['POST'])
@@ -62,20 +73,20 @@ def reportes_excel():
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from io import BytesIO
 
-    # Rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD).
+    # Rango de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD). Sin
+    # parametros exporta solo el dia de hoy (igual que ventas_excel); un
+    # rango invalido cae al default sin romper la respuesta.
     MAX_FILAS_EXCEL = 5000
     query = Reporte.query.options(db.joinedload(Reporte.prod_rel))
     desde_str = request.args.get('desde')
     hasta_str = request.args.get('hasta')
+    hoy = hoy_bogota()
     try:
-        if desde_str:
-            desde = datetime.strptime(desde_str, '%Y-%m-%d').date()
-            query = query.filter(Reporte.fecha >= desde)
-        if hasta_str:
-            hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date()
-            query = query.filter(Reporte.fecha <= hasta)
+        desde = datetime.strptime(desde_str, '%Y-%m-%d').date() if desde_str else hoy
+        hasta = datetime.strptime(hasta_str, '%Y-%m-%d').date() if hasta_str else hoy
     except ValueError:
-        pass  # rango invalido: se ignora, se exporta sin filtrar por fecha
+        desde, hasta = hoy, hoy
+    query = query.filter(Reporte.fecha >= desde, Reporte.fecha <= hasta)
 
     reportes = (query
                 .order_by(Reporte.idreporte.desc())
