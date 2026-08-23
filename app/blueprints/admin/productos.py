@@ -103,15 +103,10 @@ def productos():
     semana_lunes = (hoy - timedelta(days=hoy.weekday())).strftime('%Y-%m-%d')
     semana_viernes = ((hoy - timedelta(days=hoy.weekday()))
                       + timedelta(days=4)).strftime('%Y-%m-%d')
-    # Sin categoria no aparecen en "Ordenar", solo en el catalogo plano.
-    sin_categoria_count = Producto.query.filter(
-        Producto.activo.is_(True), Producto.categoria.is_(None)
-    ).count()
     return render_template('admin/productos.html', productos=prods,
                            imagenes_biblioteca=imagenes, bajas_recientes=bajas,
                            ver_inactivos=ver_inactivos, categorias_disponibles=CATEGORIAS,
-                           semana_lunes=semana_lunes, semana_viernes=semana_viernes,
-                           sin_categoria_count=sin_categoria_count)
+                           semana_lunes=semana_lunes, semana_viernes=semana_viernes)
 
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
