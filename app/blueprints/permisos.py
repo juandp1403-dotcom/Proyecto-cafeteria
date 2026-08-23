@@ -46,7 +46,7 @@ def tipo_usuario_actual():
         return None
     rid = current_user.get_id()
     if rid.startswith('admin:'):
-        return getattr(current_user, 'rol', None) or 'admin'
+        return getattr(current_user, 'rol', None)
     if rid.startswith('personal:'):
         return getattr(current_user, 'rol', None)
     return None
