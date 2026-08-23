@@ -66,5 +66,12 @@
     </div>
     {% endfor %}
   </div>
+
+  <div class="mt-4 text-center">
+    <a href="{{ url_for('cliente.catalogo') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-grid-3x3-gap me-1"></i>Ver catálogo completo
+    </a>
+    <small class="d-block text-muted mt-1">Incluye productos sin categoría asignada</small>
+  </div>
 </div>
 {% endblock %}

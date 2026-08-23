@@ -103,10 +103,15 @@ def productos():
     semana_lunes = (hoy - timedelta(days=hoy.weekday())).strftime('%Y-%m-%d')
     semana_viernes = ((hoy - timedelta(days=hoy.weekday()))
                       + timedelta(days=4)).strftime('%Y-%m-%d')
+    # Sin categoria no aparecen en "Ordenar", solo en el catalogo plano.
+    sin_categoria_count = Producto.query.filter(
+        Producto.activo.is_(True), Producto.categoria.is_(None)
+    ).count()
     return render_template('admin/productos.html', productos=prods,
                            imagenes_biblioteca=imagenes, bajas_recientes=bajas,
                            ver_inactivos=ver_inactivos, categorias_disponibles=CATEGORIAS,
-                           semana_lunes=semana_lunes, semana_viernes=semana_viernes)
+                           semana_lunes=semana_lunes, semana_viernes=semana_viernes,
+                           sin_categoria_count=sin_categoria_count)
 
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
@@ -340,6 +345,8 @@ ALIAS_COLUMNAS = {
     'stock_actual': 'stock',
     'stock_minimo': 'stock_minimo',
     'stock_min': 'stock_minimo',
+    'categoria': 'categoria',       # 'Categoría' normaliza igual (sin tildes)
+    'subcategoria': 'subcategoria',
 }
 
 
@@ -424,6 +431,26 @@ def productos_importar():
             errores.append(f'Fila {num_fila} ("{nombre}"): {e}')
             continue
 
+        # Categoria/subcategoria: solo se tocan si la columna viene en el
+        # Excel. Una categoria fuera del catalogo NO descarta la fila:
+        # se reporta y el producto queda como estaba (o sin categoria).
+        nueva_categoria = None
+        if 'categoria' in columnas:
+            valor = str(fila[columnas['categoria']] or '').strip()
+            if valor:
+                if valor in CATEGORIAS:
+                    nueva_categoria = valor
+                else:
+                    errores.append(
+                        f'Fila {num_fila} ("{nombre}"): categoria "{valor}" no reconocida, '
+                        f'se deja sin categoria. Categorias validas: {", ".join(CATEGORIAS)}.'
+                    )
+        nueva_subcategoria = None
+        if 'subcategoria' in columnas:
+            valor = str(fila[columnas['subcategoria']] or '').strip()
+            if valor:
+                nueva_subcategoria = valor
+
         clave = nombre.lower()
         existente = productos_por_nombre.get(clave)
         if existente:
@@ -431,10 +458,16 @@ def productos_importar():
             existente.costo = costo
             existente.stock = stock
             existente.stock_minimo = stock_minimo
+            if nueva_categoria is not None:
+                existente.categoria = nueva_categoria
+            if nueva_subcategoria is not None:
+                existente.subcategoria = nueva_subcategoria
             actualizados += 1
         else:
             nuevo = Producto(nombre=nombre, precio=precio, costo=costo,
-                            stock=stock, stock_minimo=stock_minimo)
+                            stock=stock, stock_minimo=stock_minimo,
+                            categoria=nueva_categoria,
+                            subcategoria=nueva_subcategoria)
             db.session.add(nuevo)
             productos_por_nombre[clave] = nuevo
             creados += 1
