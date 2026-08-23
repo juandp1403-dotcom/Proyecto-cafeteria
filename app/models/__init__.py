@@ -12,6 +12,7 @@ from .recuperacion import (
 )
 from .privacidad import SolicitudSupresion
 from .reporte import Reporte
+from .pedido_token import TokenPedido, crear_token_pedido, consumir_token_pedido
 
 __all__ = [
     'db', 'expr_fecha',
@@ -24,4 +25,5 @@ __all__ = [
     'TokenRecuperacion', 'crear_token_recuperacion', 'validar_token_recuperacion',
     'SolicitudSupresion',
     'Reporte',
+    'TokenPedido', 'crear_token_pedido', 'consumir_token_pedido',
 ]
