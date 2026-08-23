@@ -249,9 +249,9 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         {% block nav_links %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'cliente.catalogo' %}active{% endif %}"
-             href="{{ url_for('cliente.catalogo') }}">
-            <i class="bi bi-grid me-1"></i>Menú
+          <a class="nav-link {% if request.endpoint in ('cliente.ordenar', 'cliente.categoria') %}active{% endif %}"
+             href="{{ url_for('cliente.ordenar') }}">
+            <i class="bi bi-grid me-1"></i>Ordenar
           </a>
         </li>
         {% if current_user.is_authenticated %}

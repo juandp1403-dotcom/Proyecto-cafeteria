@@ -2,6 +2,12 @@ from ..utils import ahora_bogota
 from .base import db
 
 
+CATEGORIAS = [
+    'Bebidas', 'Paquetes', 'Galletas', 'Comida Rápida',
+    'Dulces', 'Combos', 'Postres',
+]
+
+
 class Producto(db.Model):
     __tablename__ = 'producto'
     idproducto   = db.Column(db.Integer, primary_key=True)
@@ -11,6 +17,9 @@ class Producto(db.Model):
     imagen       = db.Column(db.String(255), nullable=True, default=None)
     stock_minimo = db.Column(db.Integer, nullable=False, default=10)
     costo        = db.Column(db.Integer, nullable=False, default=0)
+    categoria    = db.Column(db.String(30), nullable=True)
+    subcategoria = db.Column(db.String(30), nullable=True)
+    descripcion  = db.Column(db.String(300), nullable=True)
     # especial_hasta opcional: si se pone, la promocion vence esa fecha.
     es_especial     = db.Column(db.Boolean, nullable=False, default=False)
     especial_hasta  = db.Column(db.Date, nullable=True)
@@ -44,6 +53,9 @@ class Producto(db.Model):
             'estado':       self.estado,
             'stock_minimo': self.stock_minimo,
             'costo':        self.costo,
+            'categoria':    self.categoria,
+            'subcategoria': self.subcategoria,
+            'descripcion':  self.descripcion,
         }
 
 

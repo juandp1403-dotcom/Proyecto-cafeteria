@@ -108,6 +108,7 @@ def create_app(config_name='default'):
         db.create_all()
         _migrar_esquema()
         _seed_datos_iniciales(config_name)
+        _seed_catalogo_categorizado()
 
     return app
 
@@ -264,6 +265,16 @@ def _migrar_esquema():
                     "ALTER TABLE personal ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE",
                     "ALTER TABLE personal ADD COLUMN activo BOOLEAN NOT NULL DEFAULT 1")
 
+    agregar_columna('producto', 'categoria',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS categoria VARCHAR(30)",
+                    "ALTER TABLE producto ADD COLUMN categoria VARCHAR(30)")
+    agregar_columna('producto', 'subcategoria',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS subcategoria VARCHAR(30)",
+                    "ALTER TABLE producto ADD COLUMN subcategoria VARCHAR(30)")
+    agregar_columna('producto', 'descripcion',
+                    "ALTER TABLE producto ADD COLUMN IF NOT EXISTS descripcion VARCHAR(300)",
+                    "ALTER TABLE producto ADD COLUMN descripcion VARCHAR(300)")
+
 
 def _clave_seed(env_var, default_dev, config_name):
     """En produccion, si falta la contraseña por variable de entorno, se
@@ -318,6 +329,8 @@ def _seed_datos_iniciales(config_name='development'):
         ))
 
     if not Producto.query.first():
+        # Sin categoria a proposito: la vista "Ordenar" solo muestra los
+        # 2 productos por categoria definidos en CATALOGO_SEED.
         productos = [
             Producto(nombre='Almuerzo Completo',  precio=8000, stock=50),
             Producto(nombre='Sanduche de Pollo',  precio=5000, stock=30),
@@ -329,6 +342,31 @@ def _seed_datos_iniciales(config_name='development'):
             Producto(nombre='Chocolate Caliente',  precio=2500, stock=25),
         ]
         db.session.add_all(productos)
+
+    db.session.commit()
+
+
+# Los productos legacy (Almuerzo Completo, Sanduche de Pollo, etc.) se
+# dejan sin categoria a proposito: la vista "Ordenar" solo debe mostrar
+# los 2 productos por categoria definidos en CATALOGO_SEED.
+
+
+def _seed_catalogo_categorizado():
+    """Inserta el catalogo de 2 productos por categoria si aun no
+    existen (identificados por nombre, para no duplicar en cada
+    arranque ni sobre lo que el admin ya haya editado)."""
+    from .catalogo_seed import CATALOGO_SEED
+    from .models import Producto
+
+    nombres_existentes = {n for (n,) in db.session.query(Producto.nombre).all()}
+    for item in CATALOGO_SEED:
+        if item['nombre'] in nombres_existentes:
+            continue
+        db.session.add(Producto(
+            nombre=item['nombre'], categoria=item['categoria'], subcategoria=item['subcategoria'],
+            precio=item['precio'], costo=item['costo'], stock=item['stock'],
+            descripcion=item['descripcion'], imagen=item['imagen'],
+        ))
 
     db.session.commit()
 

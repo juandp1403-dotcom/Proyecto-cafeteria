@@ -2,9 +2,31 @@ from flask import render_template, request, redirect, url_for, session, jsonify,
 from flask_login import current_user
 from sqlalchemy import func
 from ...models import db, expr_fecha, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
+from ...models.producto import CATEGORIAS
 from ...extensions import limiter
 from ...utils import ahora_bogota, hoy_bogota
 from . import cliente_bp
+
+
+CATEGORIA_IMAGEN = {
+    'Bebidas':       'categoria_bebidas.jpg',
+    'Paquetes':      'categoria_paquetes.jpg',
+    'Galletas':      'categoria_galletas.png',
+    'Comida Rápida': 'categoria_comida_rapida.jpg',
+    'Dulces':        'categoria_dulces.jpg',
+    'Combos':        'categoria_combos.jpg',
+    'Postres':       'categoria_postres.webp',
+}
+
+ORDEN_SUBCATEGORIA = {
+    'Bebidas':       ['Gaseosas', 'Jugos', 'Tés', 'Aguas', 'Café'],
+    'Paquetes':      ['Papas', 'Nachos', 'Plátano', 'Maní', 'Snacks'],
+    'Galletas':      ['Saladas', 'Dulces'],
+    'Comida Rápida': ['Hamburguesas', 'Perros calientes', 'Empanadas', 'Arepas', 'Pizza', 'Papas'],
+    'Dulces':        ['Dulces', 'Chocolates', 'Gomitas', 'Chicles'],
+    'Combos':        ['Combos'],
+    'Postres':       ['Tortas', 'Flanes', 'Frutas', 'Gelatinas', 'Helados', 'Otros'],
+}
 
 
 @cliente_bp.route('/', methods=['GET', 'POST'])
@@ -99,6 +121,58 @@ def catalogo():
         p.is_top = p.idproducto in top_10_ids and mapa_ventas.get(p.idproducto, 0) > 0
 
     return render_template('cliente/catalogo.html', productos=productos_ordenados)
+
+
+@cliente_bp.route('/ordenar')
+def ordenar():
+    """Landing de compra: cuadrícula de categorías (estilo KFC/Papa
+    John's) en vez del listado plano de productos."""
+    if 'cliente_doc' not in session and not current_user.is_authenticated:
+        return redirect(url_for('cliente.registro'))
+
+    categorias = [
+        {'nombre': cat, 'imagen': CATEGORIA_IMAGEN.get(cat)}
+        for cat in CATEGORIAS
+    ]
+    return render_template('cliente/ordenar.html', categorias=categorias)
+
+
+@cliente_bp.route('/categoria/<categoria>')
+def categoria(categoria):
+    if 'cliente_doc' not in session and not current_user.is_authenticated:
+        return redirect(url_for('cliente.registro'))
+
+    if categoria not in CATEGORIAS:
+        flash('Categoría no encontrada.', 'warning')
+        return redirect(url_for('cliente.ordenar'))
+
+    productos = (Producto.query
+                 .filter(Producto.activo.is_(True), Producto.categoria == categoria)
+                 .all())
+
+    orden = ORDEN_SUBCATEGORIA.get(categoria, [])
+
+    def clave_orden(p):
+        sub = p.subcategoria or ''
+        idx = orden.index(sub) if sub in orden else len(orden)
+        return (idx, p.nombre)
+
+    productos.sort(key=clave_orden)
+
+    # Agrupado en Python (no con el filtro |groupby de Jinja, que
+    # reordena alfabeticamente y rompe si hay subcategoria=None mezclada
+    # con texto) para conservar el orden de ORDEN_SUBCATEGORIA.
+    grupos = []
+    for p in productos:
+        sub = p.subcategoria or ''
+        if grupos and grupos[-1][0] == sub:
+            grupos[-1][1].append(p)
+        else:
+            grupos.append((sub, [p]))
+
+    return render_template('cliente/categoria.html', grupos=grupos,
+                           categoria=categoria, categorias=CATEGORIAS,
+                           es_cliente='cliente_doc' in session)
 
 
 @cliente_bp.route('/confirmar', methods=['POST'])

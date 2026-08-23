@@ -5,6 +5,26 @@
   <label class="form-label fw-semibold" for="{{ fprefix }}_nombre">Nombre del producto</label>
   <input type="text" id="{{ fprefix }}_nombre" class="form-control" name="nombre" placeholder="Ej: Almuerzo Completo" required>
 </div>
+<div class="mb-3">
+  <label class="form-label fw-semibold" for="{{ fprefix }}_descripcion">Descripción corta</label>
+  <textarea id="{{ fprefix }}_descripcion" class="form-control" name="descripcion" rows="2"
+            maxlength="300" placeholder="Ej: Masa de maíz frita rellena de carne de res guisada."></textarea>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col">
+    <label class="form-label fw-semibold" for="{{ fprefix }}_categoria">Categoría</label>
+    <select id="{{ fprefix }}_categoria" class="form-select" name="categoria" required>
+      <option value="" disabled selected>Selecciona...</option>
+      {% for cat in categorias_disponibles %}
+      <option value="{{ cat }}">{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col">
+    <label class="form-label fw-semibold" for="{{ fprefix }}_subcategoria">Subcategoría (opcional)</label>
+    <input type="text" id="{{ fprefix }}_subcategoria" class="form-control" name="subcategoria" placeholder="Ej: Gaseosas">
+  </div>
+</div>
 <div class="row g-3 mb-3">
   <div class="col">
     <label class="form-label fw-semibold" for="{{ fprefix }}_precio">Precio de venta ($)</label>

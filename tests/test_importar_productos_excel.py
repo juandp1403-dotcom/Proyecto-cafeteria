@@ -59,6 +59,9 @@ def _excel_bytes(headers, filas):
 
 def test_crea_producto_nuevo_y_actualiza_uno_existente(app, client):
     _login_admin(client)
+    with app.app_context():
+        total_antes = Producto.query.count()
+
     archivo = _excel_bytes(
         ['nombre', 'precio', 'costo', 'stock', 'stock_minimo'],
         [
@@ -79,9 +82,9 @@ def test_crea_producto_nuevo_y_actualiza_uno_existente(app, client):
         assert cafe.stock == 40
         assert te is not None
         assert te.precio == 2000
-        # 8 productos del seed inicial + 1 nuevo (Té Verde); Café Tinto
-        # ya existia y se actualizo, no se duplico.
-        assert Producto.query.count() == 9
+        # Solo se agrego 1 producto nuevo (Té Verde); Café Tinto ya
+        # existia y se actualizo, no se duplico.
+        assert Producto.query.count() == total_antes + 1
 
 
 def test_fila_invalida_no_tumba_la_importacion_completa(app, client):

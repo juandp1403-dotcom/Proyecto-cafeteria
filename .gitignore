@@ -14,8 +14,12 @@ server.pid
 .pytest_cache/
 
 # Imagenes subidas en tiempo de ejecucion (HU-63): no versionar contenido
-# generado en produccion, se persisten en el servidor via volumen.
-static/imagenes/*
-!static/imagenes/.gitkeep
-static/productos/*
-!static/productos/.gitkeep
+# generado en produccion, se persisten en el servidor via volumen. Las
+# imagenes curadas del catalogo (cat_*.jpg, categoria_*.jpg) SI se
+# versionan -- ver excepciones abajo.
+app/static/imagenes/*
+!app/static/imagenes/.gitkeep
+app/static/productos/*
+!app/static/productos/.gitkeep
+!app/static/productos/cat_*
+!app/static/productos/categoria_*

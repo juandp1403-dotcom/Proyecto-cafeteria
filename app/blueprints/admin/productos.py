@@ -5,6 +5,7 @@ import os
 import shutil
 import uuid
 from ...models import db, Producto, BajaInventario, ajustar_stock, registrar_auditoria
+from ...models.producto import CATEGORIAS
 from ..permisos import requiere_permiso, requiere_ver_pagina
 from ...utils import ahora_bogota
 from . import admin_bp
@@ -98,7 +99,7 @@ def productos():
              .all())
     return render_template('admin/productos.html', productos=prods,
                            imagenes_biblioteca=imagenes, bajas_recientes=bajas,
-                           ver_inactivos=ver_inactivos)
+                           ver_inactivos=ver_inactivos, categorias_disponibles=CATEGORIAS)
 
 
 @admin_bp.route('/productos/nuevo', methods=['POST'])
@@ -145,8 +146,12 @@ def producto_nuevo():
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
                 imagen = lib_image
     es_especial = request.form.get('es_especial') == '1'
+    categoria = request.form.get('categoria', '').strip() or None
+    subcategoria = request.form.get('subcategoria', '').strip() or None
+    descripcion = request.form.get('descripcion', '').strip() or None
     prod = Producto(nombre=nombre, precio=precio, stock=stock, imagen=imagen,
-                    stock_minimo=stock_minimo, costo=costo, es_especial=es_especial)
+                    stock_minimo=stock_minimo, costo=costo, es_especial=es_especial,
+                    categoria=categoria, subcategoria=subcategoria, descripcion=descripcion)
     db.session.add(prod)
     db.session.commit()
     registrar_auditoria(current_user.email, 'crear_producto', f'producto:{prod.idproducto}',
@@ -179,6 +184,9 @@ def producto_editar(idproducto):
     prod.stock  = nuevo_stock
     prod.costo  = nuevo_costo
     prod.es_especial = request.form.get('es_especial') == '1'
+    prod.categoria = request.form.get('categoria', '').strip() or None
+    prod.subcategoria = request.form.get('subcategoria', '').strip() or None
+    prod.descripcion = request.form.get('descripcion', '').strip() or None
     try:
         sm = int(request.form.get('stock_minimo', prod.stock_minimo))
         if sm > 0:
