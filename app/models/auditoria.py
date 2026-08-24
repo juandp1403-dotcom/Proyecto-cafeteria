@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from flask import current_app
+
 from .base import db
 
 
@@ -16,7 +18,11 @@ class RegistroAuditoria(db.Model):
 
 
 def registrar_auditoria(usuario, accion, entidad=None, detalle=None):
-    """Registra un evento; nunca lanza excepcion hacia el llamador."""
+    """Registra un evento; nunca lanza excepcion hacia el llamador.
+
+    Ademas de guardarlo en la tabla (para /admin/auditoria), lo imprime
+    en el logger de la app -- sin esto, eventos como login_fallido solo
+    eran visibles entrando al panel, nunca en los logs de Coolify."""
     try:
         db.session.add(RegistroAuditoria(
             usuario=usuario or 'desconocido',
@@ -27,3 +33,9 @@ def registrar_auditoria(usuario, accion, entidad=None, detalle=None):
         db.session.commit()
     except Exception:
         db.session.rollback()
+
+    try:
+        nivel = current_app.logger.warning if accion == 'login_fallido' else current_app.logger.info
+        nivel("auditoria: usuario=%s accion=%s entidad=%s detalle=%s", usuario, accion, entidad, detalle)
+    except Exception:
+        pass
