@@ -331,37 +331,60 @@ def _seed_datos_iniciales(config_name='development'):
     from werkzeug.security import generate_password_hash
 
     documentos_existentes = {a.documento for a in Admin.query.with_entities(Admin.documento).all()}
+    correos_existentes = {a.email for a in Admin.query.with_entities(Admin.email).all()}
 
-    doc_admin = int(os.environ.get('ADMIN_DOCUMENTO', '1000000'))
-    doc_cajero = int(os.environ.get('CAJERO_DOCUMENTO', '2000000'))
-    doc_entregador = int(os.environ.get('ENTREGADOR_DOCUMENTO', '3000000'))
-
-    if doc_admin not in documentos_existentes:
+    def _agregar_admin_seed(documento, nombre, email, clave_plana, rol):
+        # HU-70: antes solo se validaba el documento -- si el correo ya
+        # existia en OTRA cuenta (email tiene UNIQUE), el INSERT fallaba
+        # con IntegrityError durante el autoflush del Producto.query.first()
+        # de mas abajo, tumbando el arranque completo del worker (el
+        # try/except de mas abajo nunca llegaba a proteger este INSERT).
+        if documento in documentos_existentes:
+            return
+        if email in correos_existentes:
+            print(f"[seed] ADVERTENCIA: no se creo la cuenta '{nombre}' "
+                  f"(documento={documento}) porque el correo '{email}' ya "
+                  f"esta en uso por otra cuenta. Ajusta la variable de "
+                  f"entorno correspondiente o revisa la cuenta existente.")
+            return
         db.session.add(Admin(
-            documento=doc_admin,
-            nombre=os.environ.get('ADMIN_NOMBRE', 'Administrador SENA'),
-            email=os.environ.get('ADMIN_EMAIL', 'admin@cafeteria.com'),
-            clave=generate_password_hash(_clave_seed('ADMIN_PASSWORD', 'Admin123', config_name)),
-            rol='admin',
+            documento=documento, nombre=nombre, email=email,
+            clave=generate_password_hash(clave_plana), rol=rol,
         ))
+        correos_existentes.add(email)
 
-    if doc_cajero not in documentos_existentes:
-        db.session.add(Admin(
-            documento=doc_cajero,
-            nombre=os.environ.get('CAJERO_NOMBRE', 'Cajero Principal'),
-            email=os.environ.get('CAJERO_EMAIL', 'cajero@cafeteria.com'),
-            clave=generate_password_hash(_clave_seed('CAJERO_PASSWORD', 'Cajero123', config_name)),
-            rol='cajero',
-        ))
+    _agregar_admin_seed(
+        int(os.environ.get('ADMIN_DOCUMENTO', '1000000')),
+        os.environ.get('ADMIN_NOMBRE', 'Administrador SENA'),
+        os.environ.get('ADMIN_EMAIL', 'admin@cafeteria.com'),
+        _clave_seed('ADMIN_PASSWORD', 'Admin123', config_name),
+        'admin',
+    )
+    _agregar_admin_seed(
+        int(os.environ.get('CAJERO_DOCUMENTO', '2000000')),
+        os.environ.get('CAJERO_NOMBRE', 'Cajero Principal'),
+        os.environ.get('CAJERO_EMAIL', 'cajero@cafeteria.com'),
+        _clave_seed('CAJERO_PASSWORD', 'Cajero123', config_name),
+        'cajero',
+    )
+    _agregar_admin_seed(
+        int(os.environ.get('ENTREGADOR_DOCUMENTO', '3000000')),
+        os.environ.get('ENTREGADOR_NOMBRE', 'Entregador Principal'),
+        os.environ.get('ENTREGADOR_EMAIL', 'entregador@cafeteria.com'),
+        _clave_seed('ENTREGADOR_PASSWORD', 'Entregador123', config_name),
+        'despachador',
+    )
 
-    if doc_entregador not in documentos_existentes:
-        db.session.add(Admin(
-            documento=doc_entregador,
-            nombre=os.environ.get('ENTREGADOR_NOMBRE', 'Entregador Principal'),
-            email=os.environ.get('ENTREGADOR_EMAIL', 'entregador@cafeteria.com'),
-            clave=generate_password_hash(_clave_seed('ENTREGADOR_PASSWORD', 'Entregador123', config_name)),
-            rol='despachador',
-        ))
+    # Commit aparte (no combinado con el seed de productos de abajo): asi
+    # el autoflush de la consulta Producto.query.first() nunca encuentra
+    # estos INSERT todavia pendientes, y si de verdad fallaran, quedan
+    # protegidos por su propio try/except en vez de tumbar el arranque.
+    from sqlalchemy.exc import IntegrityError
+    try:
+        db.session.commit()
+    except IntegrityError as e:
+        db.session.rollback()
+        print(f"[seed] ADVERTENCIA: fallo al crear las cuentas semilla: {e}")
 
     if not Producto.query.first():
         # Sin categoria a proposito: la vista "Ordenar" solo muestra los
