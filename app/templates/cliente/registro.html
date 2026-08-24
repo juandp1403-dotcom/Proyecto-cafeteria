@@ -24,14 +24,6 @@
     transform: scale(1.1);
     box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
   }
-
-  /* Quita las flechas de subir/bajar en los campos numéricos del registro */
-  .no-spinner::-webkit-inner-spin-button,
-  .no-spinner::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-  .no-spinner { -moz-appearance: textfield; }
 </style>
 {% endblock %}
 
@@ -62,13 +54,8 @@
           <label class="form-label fw-semibold" for="registro-documento">
             <i class="bi bi-person-vcard me-1" style="color:var(--sena-green)"></i>Número de Documento
           </label>
-<<<<<<< HEAD
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="registro-documento" class="form-control form-control-lg" name="documento"
                  placeholder="Ej: 1012345678" required autofocus>
-=======
-          <input type="number" id="registro-documento" class="form-control form-control-lg no-spinner" name="documento"
-                 required autofocus>
->>>>>>> 20bb9d65683e8a185bb2be72afb1627ea89ee4e2
         </div>
 
         <div class="mb-3">
@@ -83,13 +70,8 @@
           <label class="form-label fw-semibold" for="registro-ficha">
             <i class="bi bi-mortarboard me-1" style="color:var(--sena-green)"></i>Número de Ficha
           </label>
-<<<<<<< HEAD
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="registro-ficha" class="form-control form-control-lg" name="ficha"
                  placeholder="Ej: 2895461" required>
-=======
-          <input type="number" id="registro-ficha" class="form-control form-control-lg no-spinner" name="ficha"
-                 required>
->>>>>>> 20bb9d65683e8a185bb2be72afb1627ea89ee4e2
         </div>
 
         {# HU-65: consentimiento obligatorio, NO marcado por defecto (Ley 1581 de 2012) #}
