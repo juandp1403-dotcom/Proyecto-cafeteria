@@ -12,8 +12,8 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="mb-3">
           <label class="form-label fw-semibold" for="clave">Nueva contraseña</label>
-          <input type="password" id="clave" class="form-control" name="clave" required minlength="8"
-                 placeholder="Mínimo 8 caracteres, letras y números">
+          <input type="password" id="clave" class="form-control" name="clave" required minlength="8">
+          <div class="form-text">Mínimo 8 caracteres, combinando letras y números.</div>
         </div>
         <button type="submit" class="btn btn-sena w-100">
           <i class="bi bi-check-circle me-2"></i>Actualizar contraseña

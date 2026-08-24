@@ -1,7 +1,10 @@
 from flask import render_template, request, redirect, url_for, session, jsonify, flash, current_app
 from flask_login import current_user
 from sqlalchemy import func
-from ...models import db, expr_fecha, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion
+from ...models import (
+    db, expr_fecha, Producto, Cliente, Venta, DetalleVenta, SolicitudSupresion,
+    crear_token_pedido, consumir_token_pedido,
+)
 from ...models.producto import CATEGORIAS
 from ...extensions import limiter
 from ...utils import ahora_bogota, hoy_bogota
@@ -170,9 +173,15 @@ def categoria(categoria):
         else:
             grupos.append((sub, [p]))
 
+    es_cliente = 'cliente_doc' in session
+    # HU-49: token de un solo uso para que un doble clic (o una peticion
+    # reenviada por red lenta) en "Confirmar pedido" no cree la misma
+    # venta dos veces -- ver consumir_token_pedido() en /confirmar.
+    pedido_token = crear_token_pedido(session['cliente_doc']) if es_cliente else None
+
     return render_template('cliente/categoria.html', grupos=grupos,
                            categoria=categoria, categorias=CATEGORIAS,
-                           es_cliente='cliente_doc' in session)
+                           es_cliente=es_cliente, pedido_token=pedido_token)
 
 
 @cliente_bp.route('/confirmar', methods=['POST'])
@@ -183,6 +192,14 @@ def confirmar():
     data = request.get_json(silent=True)
     if data is None:
         return jsonify({'error': 'Cuerpo de petición inválido'}), 400
+
+    # HU-49: token de un solo uso, consumido con UPDATE condicional
+    # atomico (mismo patron que ajustar_stock) -- si dos peticiones
+    # llegan casi al mismo tiempo con el mismo token (doble clic, red
+    # lenta reenviando el POST), solo la primera lo consume.
+    if not consumir_token_pedido(data.get('token'), session['cliente_doc']):
+        return jsonify({'error': 'Este pedido ya fue procesado, o la página está desactualizada. Recarga e intenta de nuevo.'}), 409
+
     items = data.get('items', [])
     if not items:
         return jsonify({'error': 'Carrito vacio'}), 400

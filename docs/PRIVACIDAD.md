@@ -11,9 +11,28 @@
 | Nombre completo | Entregar el pedido a la persona correcta | Consentimiento |
 | Número de ficha | Verificar vinculación con el centro | Consentimiento |
 
-No se recolectan datos sensibles ni datos de menores de edad.
+No se recolectan datos sensibles.
 El consentimiento se solicita de forma expresa mediante un checkbox **no premarcado**
 en `templates/cliente/registro.html` y se valida también en el backend.
+
+**Aprendices menores de edad (16-17 años):** el centro tiene aprendices menores de edad
+(adolescentes, según el Código de la Infancia y la Adolescencia, que cubre hasta los 18 años),
+y este sistema sí trata sus datos (documento, nombre, ficha) en el mismo formulario de registro.
+El Artículo 7 de la Ley 1581 de 2012 exige que el representante legal del menor participe en la
+autorización de ese tratamiento — un checkbox marcado por el propio adolescente en el momento del
+registro **no cumple ese requisito por sí solo**.
+
+Todo aprendiz (incluidos los menores de edad) firma un **contrato de aprendizaje** como condición
+para vincularse al SENA; en el caso de menores, ese contrato requiere la participación de su
+representante legal, lo cual cubre la exigencia general del Artículo 7 de la Ley 1581 de 2012 para
+la relación de formación con el SENA.
+
+**Pendiente de definir con el área jurídica/de protección de datos del SENA:** el contrato de
+aprendizaje autoriza el tratamiento de datos para la relación de formación en general, pero **no
+está confirmado que cubra explícitamente el tratamiento de datos por parte de este sistema de
+cafetería en particular** (un servicio adicional, no el proceso central de matrícula). Falta
+verificar si el texto del contrato es lo bastante amplio para amparar este uso, o si se necesita
+una autorización/cláusula específica para sistemas internos como este.
 
 ## 2. Derecho de supresión (Ley 1581 de 2012, Art. 9)
 

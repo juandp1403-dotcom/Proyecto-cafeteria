@@ -169,7 +169,7 @@
             <span>Total</span>
             <span style="color:var(--sena-green)">$<span id="pedido-total">0</span></span>
           </div>
-          <button class="btn btn-sena w-100" onclick="confirmarPedido()">
+          <button class="btn btn-sena w-100" id="btn-confirmar-pedido" onclick="confirmarPedido()">
             <i class="bi bi-check2-circle me-1"></i>Finalizar Compra
           </button>
         </div>
@@ -194,6 +194,7 @@
 {% if es_cliente %}
 <script>
 const CARRITO_KEY = 'carrito_cafeteria';
+const PEDIDO_TOKEN = {{ pedido_token|tojson }};
 
 function cargarCarrito() {
   try {
@@ -296,7 +297,13 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+let pedidoEnCurso = false;
+
 async function confirmarPedido() {
+  // Protege contra doble clic / doble tap ademas del token del servidor:
+  // si ya hay un envio en curso, ignora clics adicionales por completo.
+  if (pedidoEnCurso) return;
+
   const carrito = cargarCarrito();
   const items = Object.entries(carrito).map(([id, p]) => ({
     idproducto: parseInt(id),
@@ -304,6 +311,9 @@ async function confirmarPedido() {
   }));
   if (!items.length) return;
 
+  pedidoEnCurso = true;
+  const btn = document.getElementById('btn-confirmar-pedido');
+  if (btn) btn.disabled = true;
   new bootstrap.Modal('#modalProcesando').show();
 
   try {
@@ -313,7 +323,7 @@ async function confirmarPedido() {
         'Content-Type': 'application/json',
         'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content
       },
-      body: JSON.stringify({ items })
+      body: JSON.stringify({ items, token: PEDIDO_TOKEN })
     });
     const data = await resp.json();
     bootstrap.Modal.getInstance('#modalProcesando').hide();
@@ -321,13 +331,15 @@ async function confirmarPedido() {
     if (resp.ok) {
       sessionStorage.removeItem(CARRITO_KEY);
       window.location.href = `/cliente/factura/${data.idventa}`;
-    } else {
-      mostrarAlerta('danger', data.error || 'Error al procesar el pedido.');
+      return;
     }
+    mostrarAlerta('danger', data.error || 'Error al procesar el pedido.');
   } catch (e) {
     bootstrap.Modal.getInstance('#modalProcesando').hide();
     mostrarAlerta('danger', 'Error de red. Intenta nuevamente.');
   }
+  pedidoEnCurso = false;
+  if (btn) btn.disabled = false;
 }
 
 function mostrarAlerta(tipo, msg) {
