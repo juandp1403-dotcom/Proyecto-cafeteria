@@ -112,6 +112,40 @@ def test_fila_invalida_no_tumba_la_importacion_completa(app, client):
         assert Producto.query.filter_by(nombre='Producto Malo').first() is None
 
 
+def test_valores_opcionales_vacios_usan_sus_predeterminados(app, client):
+    _login_admin(client)
+    archivo = _excel_bytes(
+        ['nombre', 'precio', 'costo', 'stock', 'stock_minimo'],
+        [['Producto Sin Inventario', 2500, None, None, None]],
+    )
+    resp = client.post('/admin/productos/importar', data={
+        'archivo': (archivo, 'productos.xlsx'),
+    }, content_type='multipart/form-data', follow_redirects=True)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        producto = Producto.query.filter_by(nombre='Producto Sin Inventario').one()
+        assert producto.costo == 0
+        assert producto.stock == 0
+        assert producto.stock_minimo == 10
+
+
+def test_precio_vacio_se_importa_con_cero(app, client):
+    _login_admin(client)
+    archivo = _excel_bytes(
+        ['Producto', 'Precio ($)', 'Costo ($)', 'Stock', 'Stock Mínimo'],
+        [['Producto Sin Precio', None, 500, 2, 1]],
+    )
+    resp = client.post('/admin/productos/importar', data={
+        'archivo': (archivo, 'Inventario Cafeteria (1).xlsx'),
+    }, content_type='multipart/form-data', follow_redirects=True)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        producto = Producto.query.filter_by(nombre='Producto Sin Precio').one()
+        assert producto.precio == 0
+
+
 def test_rechaza_archivo_sin_columna_precio(app, client):
     _login_admin(client)
     archivo = _excel_bytes(['nombre', 'descripcion'], [['X', 'algo']])

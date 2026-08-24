@@ -412,10 +412,17 @@ def productos_importar():
         if nombre.lower() == 'total':
             continue
         try:
-            precio = _parsear_valor_numerico(fila[columnas['precio']], minimo=0)
-            costo = _parsear_valor_numerico(fila[columnas['costo']], minimo=0) if 'costo' in columnas else 0
-            stock = _parsear_valor_numerico(fila[columnas['stock']], minimo=0) if 'stock' in columnas else 0
-            stock_minimo = _parsear_valor_numerico(fila[columnas['stock_minimo']], minimo=1) if 'stock_minimo' in columnas else 10
+            precio = _parsear_valor_numerico(
+                fila[columnas['precio']], minimo=0, permitir_none=True
+            )
+            if precio is None:
+                precio = 0
+                errores.append(
+                    f'Fila {num_fila} ("{nombre}"): precio vacio, se establece en 0.'
+                )
+            costo = _parsear_valor_numerico(fila[columnas['costo']], minimo=0, permitir_none=True) if 'costo' in columnas else 0
+            stock = _parsear_valor_numerico(fila[columnas['stock']], minimo=0, permitir_none=True) if 'stock' in columnas else 0
+            stock_minimo = _parsear_valor_numerico(fila[columnas['stock_minimo']], minimo=1, permitir_none=True) if 'stock_minimo' in columnas else 10
             if costo is None:
                 costo = 0
             if stock is None:
