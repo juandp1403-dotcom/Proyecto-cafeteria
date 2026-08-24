@@ -1,7 +1,5 @@
-from datetime import datetime
-
 from flask import current_app
-
+from ..utils import ahora_bogota
 from .base import db
 
 
@@ -14,7 +12,7 @@ class RegistroAuditoria(db.Model):
     accion     = db.Column(db.String(50), nullable=False)
     entidad    = db.Column(db.String(150), nullable=True)
     detalle    = db.Column(db.String(500), nullable=True)
-    timestamp  = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    timestamp  = db.Column(db.DateTime, default=ahora_bogota, nullable=False)
 
 
 def registrar_auditoria(usuario, accion, entidad=None, detalle=None):
