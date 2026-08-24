@@ -84,7 +84,7 @@ def dashboard():
         ventas_mensuales.append(mapa_meses.get(clave, 0))
         etiquetas_meses.append(etiqueta)
 
-    # ── Top 15 productos más vendidos — solo pagados/entregados ──
+    # ── Top 15 productos más vendidos — solo hoy, pagados/entregados ──
     rows_top = (
         db.session.query(
             Producto.nombre,
@@ -93,7 +93,7 @@ def dashboard():
         .join(DetalleVenta, DetalleVenta.idproducto == Producto.idproducto)
         .join(Venta, Venta.idventa == DetalleVenta.idventa)
         .filter(
-            expr_fecha(Venta.fechaventa) >= hoy - timedelta(days=30),
+            expr_fecha(Venta.fechaventa) == hoy,
             Venta.estado.in_(estados_pagados)
         )
         .group_by(Producto.nombre)

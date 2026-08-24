@@ -6,7 +6,7 @@
 
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="fw-bold mb-0" style="color:var(--sena-green)">
-      <i class="bi bi-speedometer2 me-2"></i>Panel Administrativo
+      <img src="{{ url_for('static', filename='img/panel_administrativo.png') }}" alt="" style="width:26px;height:26px;object-fit:contain;vertical-align:-6px" class="me-2">Panel Administrativo
     </h4>
   </div>
 
@@ -50,7 +50,7 @@
     </div>
     <div class="col-lg-5">
       <div class="card p-3">
-        <h6 class="fw-bold mb-2"><i class="bi bi-trophy me-2" style="color:var(--sena-green)"></i>Top 15 Más Vendidos</h6>
+        <h6 class="fw-bold mb-2"><i class="bi bi-trophy me-2" style="color:var(--sena-green)"></i>Top 15 Más Vendidos Hoy</h6>
         {% if top_15 %}
         <div style="max-height:260px;overflow-y:auto">
           {% for nombre, cant in top_15 %}
@@ -82,7 +82,6 @@
   </div>
 
   <!-- Alertas stock -->
-  {% if productos_agotados %}
   <div class="card mb-3">
     <div class="card-header" style="background:#dc3545;color:#fff;border-radius:11px 11px 0 0 !important;padding:.65rem 1.25rem;font-weight:600">
       <i class="bi bi-x-circle me-2"></i>Agotados
@@ -97,14 +96,14 @@
             <td class="text-center"><span class="badge bg-danger">0</span></td>
             <td><a href="{{ url_for('admin_panel.compras') }}" class="btn btn-sena btn-sm"><i class="bi bi-plus-circle me-1"></i>Reabastecer</a></td>
           </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-muted py-3">No hay productos agotados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
-  {% endif %}
 
-  {% if productos_bajo %}
   <div class="card mb-3">
     <div class="card-header-sena">
       <i class="bi bi-exclamation-triangle me-2"></i>Stock Bajo
@@ -121,12 +120,13 @@
             </td>
             <td><a href="{{ url_for('admin_panel.compras') }}" class="btn btn-sena btn-sm"><i class="bi bi-plus-circle me-1"></i>Reabastecer</a></td>
           </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-muted py-3">No hay productos con stock bajo.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
-  {% endif %}
 
 </div>
 {% endblock %}

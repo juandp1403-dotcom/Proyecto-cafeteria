@@ -150,8 +150,48 @@
 
     .sidebar .nav-link i { margin-right: 8px; }
 
-    /* ══ Logo SENA SVG inline ════════════════════════════════════════════════ */
-    .sena-logo-svg { height: 38px; }
+    /* ══ Logo SENA (círculo con borde verde tenue) ═════════════════════════════ */
+    .sena-logo-circle {
+      width: 42px; height: 42px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      border: 1.5px solid rgba(var(--sena-green-rgb), .45);
+      background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+
+    .sena-logo-circle img { width: 76%; height: 76%; object-fit: contain; }
+
+    .sena-logo-circle--lg {
+      width: 60px; height: 60px;
+      border: 2px solid rgba(255,255,255,.55);
+    }
+
+    /* ══ Íconos del menú admin ══════════════════════════════════════════════ */
+    .nav-icon-img-stack { width: 24px; height: 24px; object-fit: contain; }
+
+    /* ══ Separadores y estado activo del menú ═══════════════════════════════ */
+    .navbar-nav .nav-item + .nav-item {
+      border-left: 1px solid rgba(var(--sena-green-rgb), .25);
+    }
+    .navbar-nav .nav-link {
+      padding: 4px 4px;
+      border-radius: 8px;
+      transition: background-color .15s ease;
+      width: 100px;
+      height: 58px;
+      justify-content: center;
+      text-align: center;
+    }
+    .navbar-nav .nav-link span {
+      white-space: normal;
+      line-height: 1.15;
+    }
+    .navbar-nav .nav-link.active,
+    .navbar-nav .nav-link:hover {
+      background-color: rgba(var(--sena-green-rgb), .12);
+    }
 
     /* ══ Producto card (catálogo) ════════════════════════════════════════════ */
     .producto-card {
@@ -232,12 +272,9 @@
 
     <!-- Logo + Nombre -->
     <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-      <!-- Logo SENA SVG simplificado (verde institucional) -->
-      <svg class="sena-logo-svg" viewBox="0 0 120 50" xmlns="http://www.w3.org/2000/svg">
-        <rect width="120" height="50" rx="6" fill="#39A900"/>
-        <text x="50%" y="35" dominant-baseline="middle" text-anchor="middle"
-              fill="white" font-size="22" font-weight="900" font-family="Arial,sans-serif">SENA</text>
-      </svg>
+      <span class="sena-logo-circle">
+        <img src="{{ url_for('static', filename='img/logo_sena.png') }}" alt="Logo SENA">
+      </span>
       <span>Cafetería CGAO</span>
     </a>
 
@@ -246,68 +283,78 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navMain">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0" style="border-left:1px solid rgba(var(--sena-green-rgb), .25); padding-left:14px; margin-left:8px;">
         {% block nav_links %}
+        {% if current_user.is_authenticated or session.get('cliente_doc') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint in ('cliente.ordenar', 'cliente.categoria') %}active{% endif %}"
-             href="{{ url_for('cliente.ordenar') }}">
-            <i class="bi bi-grid me-1"></i>Ordenar
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint in ('cliente.ordenar', 'cliente.categoria') %}active{% endif %}"
+             href="{{ url_for('cliente.ordenar') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/menu_logo.png') }}" alt="" style="width:24px;height:24px;object-fit:contain;">
+            <span style="font-size:.75rem;">Ordenar</span>
           </a>
         </li>
+        {% endif %}
         {% if current_user.is_authenticated %}
           {% if puede_ver_pagina('dashboard') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.dashboard' %}active{% endif %}"
-             href="{{ url_for('admin_panel.dashboard') }}">
-            <i class="bi bi-speedometer2 me-1"></i>Panel Administrativo
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.dashboard' %}active{% endif %}"
+             href="{{ url_for('admin_panel.dashboard') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/panel_administrativo.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Panel Administrativo</span>
           </a>
         </li>
           {% endif %}
           {% if puede_ver_pagina('productos') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.productos' %}active{% endif %}"
-             href="{{ url_for('admin_panel.productos') }}">
-            <i class="bi bi-box-seam me-1"></i>Inventario
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.productos' %}active{% endif %}"
+             href="{{ url_for('admin_panel.productos') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/inventario.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Inventario</span>
           </a>
         </li>
           {% endif %}
           {% if puede_ver_pagina('ventas') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.ventas' %}active{% endif %}"
-             href="{{ url_for('admin_panel.ventas') }}">
-            <i class="bi bi-graph-up me-1"></i>Ventas
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.ventas' %}active{% endif %}"
+             href="{{ url_for('admin_panel.ventas') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/ventas.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Ventas</span>
           </a>
         </li>
           {% endif %}
           {% if puede_ver_pagina('compras') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.compras' %}active{% endif %}"
-             href="{{ url_for('admin_panel.compras') }}">
-            <i class="bi bi-truck me-1"></i>Compras
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.compras' %}active{% endif %}"
+             href="{{ url_for('admin_panel.compras') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/compras.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Compras</span>
           </a>
         </li>
           {% endif %}
           {% if puede_ver_pagina('usuarios') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.usuarios' %}active{% endif %}"
-             href="{{ url_for('admin_panel.usuarios') }}">
-            <i class="bi bi-people me-1"></i>Usuarios
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.usuarios' %}active{% endif %}"
+             href="{{ url_for('admin_panel.usuarios') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/usuarios.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Usuarios</span>
           </a>
         </li>
           {% endif %}
           {% if puede_ver_pagina('reportes') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.reportes' %}active{% endif %}"
-             href="{{ url_for('admin_panel.reportes') }}">
-            <i class="bi bi-clipboard2-data me-1"></i>Reportes
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.reportes' %}active{% endif %}"
+             href="{{ url_for('admin_panel.reportes') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/reportes.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Reportes</span>
           </a>
         </li>
           {% endif %}
           {% if puede_ver_pagina('auditoria') %}
         <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'admin_panel.auditoria' %}active{% endif %}"
-             href="{{ url_for('admin_panel.auditoria') }}">
-            <i class="bi bi-journal-text me-1"></i>Auditoría
+          <a class="nav-link d-flex flex-column align-items-center {% if request.endpoint == 'admin_panel.auditoria' %}active{% endif %}"
+             href="{{ url_for('admin_panel.auditoria') }}" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/auditoria.png') }}" alt="" class="nav-icon-img-stack">
+            <span style="font-size:.75rem;">Auditoría</span>
           </a>
         </li>
           {% endif %}
@@ -315,11 +362,12 @@
         {% endblock %}
       </ul>
 
-      <div class="d-flex align-items-center gap-3">
+      <div class="d-flex align-items-center gap-3" style="border-left:1px solid rgba(var(--sena-green-rgb), .25); padding-left:14px; margin-left:8px;">
         <!-- Nombre de usuario -->
         {% if current_user is defined and current_user.is_authenticated %}
-          <span class="text-muted small">
-            <i class="bi bi-person-circle"></i>
+          <span class="text-muted small d-flex flex-column align-items-center" style="line-height:1.1;">
+            <img src="{{ url_for('static', filename='img/' + avatar_perfil(current_user.nombre)) }}"
+                 alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover;">
             {{ current_user.nombre }}
           </span>
           <form method="POST" action="{{ url_for('empleados.logout') }}" class="d-inline">
@@ -328,6 +376,10 @@
               <i class="bi bi-box-arrow-right"></i>
             </button>
           </form>
+        {% elif session.get('cliente_doc') %}
+          <a href="{{ url_for('cliente.salir') }}" class="btn btn-outline-secondary btn-sm" title="Salir e ir al inicio de sesión">
+            <i class="bi bi-box-arrow-left"></i>
+          </a>
         {% endif %}
 
         <!-- Toggle de tema -->

@@ -162,6 +162,12 @@ def _migrar_esquema():
             return
         _ejecutar_migracion(ddl)
 
+    def constraint_unico_existe(tabla, nombre):
+        try:
+            return nombre in [c['name'] for c in insp.get_unique_constraints(tabla)]
+        except Exception:
+            return False
+
     if es_pg:
         _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)")
         _ejecutar_migracion("ALTER TABLE venta ALTER COLUMN fechaventa TYPE TIMESTAMP USING fechaventa::timestamp")
@@ -174,7 +180,8 @@ def _migrar_esquema():
         _ejecutar_migracion("ALTER TABLE producto ALTER COLUMN nombre TYPE VARCHAR(100)")
         _ejecutar_migracion("ALTER TABLE cliente ALTER COLUMN nombre TYPE VARCHAR(100)")
         _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN email TYPE VARCHAR(120)")
-        _ejecutar_migracion("ALTER TABLE admin ADD CONSTRAINT admin_email_key UNIQUE (email)")
+        if not constraint_unico_existe('admin', 'admin_email_key'):
+            _ejecutar_migracion("ALTER TABLE admin ADD CONSTRAINT admin_email_key UNIQUE (email)")
         _ejecutar_migracion("ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_idadmin_key")
         _ejecutar_migracion("ALTER TABLE reporte DROP CONSTRAINT IF EXISTS reporte_producto_key")
         _ejecutar_migracion("ALTER TABLE personal ALTER COLUMN email TYPE VARCHAR(120)")
@@ -186,7 +193,11 @@ def _migrar_esquema():
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)")
         # 'preciou' es una columna huerfana en la BD real (no existe en el
         # modelo ni en el historial de git); bloqueaba cualquier insert nuevo.
-        _ejecutar_migracion("ALTER TABLE detalleventa ALTER COLUMN preciou DROP NOT NULL")
+        # Se verifica que exista antes de intentar el ALTER, para no
+        # registrar un warning en cada arranque en las bases que nunca
+        # tuvieron esa columna.
+        if columna_existe('detalleventa', 'preciou'):
+            _ejecutar_migracion("ALTER TABLE detalleventa ALTER COLUMN preciou DROP NOT NULL")
         # Race condition entre workers de gunicorn al sembrar el catalogo
         # (ver _seed_catalogo_categorizado) dejo productos duplicados por
         # nombre en la BD real. Se borra el duplicado mas reciente de
