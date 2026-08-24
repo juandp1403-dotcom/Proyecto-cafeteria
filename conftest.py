@@ -11,6 +11,9 @@ antes de que cualquier test importe la app.
 import os
 
 os.environ.pop('SSH_HOST', None)
+# Las pruebas antiguas necesitan las cuentas y productos semilla; en la
+# aplicacion real la carga inicial es opt-in mediante esta variable.
+os.environ['SEED_INITIAL_DATA'] = '1'
 
 import dotenv
 

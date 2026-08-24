@@ -107,8 +107,11 @@ def create_app(config_name='default'):
     with app.app_context():
         db.create_all()
         _migrar_esquema()
-        _seed_datos_iniciales(config_name)
-        _seed_catalogo_categorizado()
+        # Los datos iniciales se cargan solo cuando se solicita expresamente.
+        # Asi un reinicio no crea inventario ni cuentas/roles por defecto.
+        if os.environ.get('SEED_INITIAL_DATA', '').strip().lower() in ('1', 'true', 'si', 'yes'):
+            _seed_datos_iniciales(config_name)
+            _seed_catalogo_categorizado()
 
     return app
 
