@@ -5,23 +5,33 @@
 <style>
   .btn-admin-crown {
     cursor: pointer;
-    font-size: 1.2rem;
-    color: #FFD700 !important;
     border: 2px solid #FFD700;
     border-radius: 50%;
     width: 38px; height: 38px;
     display: flex; align-items: center; justify-content: center;
-    background-color: #1a1a1a;
+    background-color: #fff;
     transition: all .2s ease;
     text-decoration: none;
     box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+    overflow: hidden;
+  }
+  .btn-admin-crown img {
+    width: 62%; height: 62%;
+    object-fit: contain;
   }
   .btn-admin-crown:hover {
-    background-color: #FFD700;
-    color: #1a1a1a !important;
+    border-color: #e6c200;
     transform: scale(1.1);
     box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
   }
+
+  /* Quita las flechas de subir/bajar en los campos numéricos del registro */
+  .no-spinner::-webkit-inner-spin-button,
+  .no-spinner::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spinner { -moz-appearance: textfield; }
 </style>
 {% endblock %}
 
@@ -33,14 +43,12 @@
 {# Añadimos el botón corona junto al toggle vía JS tras cargar la página #}
 <div class="min-vh-100 d-flex align-items-center justify-content-center px-3" style="background:var(--bg-main)">
   <div class="card" style="width:100%;max-width:420px">
-    <div class="card-header-sena text-center">
-      <svg viewBox="0 0 120 50" xmlns="http://www.w3.org/2000/svg" style="height:40px;display:block;margin:0 auto 8px">
-        <rect width="120" height="50" rx="6" fill="white" fill-opacity=".2"/>
-        <text x="50%" y="35" dominant-baseline="middle" text-anchor="middle"
-              fill="white" font-size="22" font-weight="900" font-family="Arial,sans-serif">SENA</text>
-      </svg>
-      <h5 class="mb-0"><i class="bi bi-cup-hot me-2"></i>Cafetería CGAO</h5>
-      <small class="opacity-75">Ingresa tus datos para hacer tu pedido</small>
+    <div class="card-header-sena text-center py-4">
+      <span class="sena-logo-circle sena-logo-circle--lg mx-auto mb-2">
+        <img src="{{ url_for('static', filename='img/logo_sena.png') }}" alt="Logo SENA">
+      </span>
+      <h4 class="mb-1 fw-bold"><i class="bi bi-cup-hot-fill me-2"></i>Cafetería CGAO</h4>
+      <p class="mb-0 small" style="opacity:.9">Tu pedido en minutos, sin filas ni esperas</p>
     </div>
 
     <div class="card-body p-4">
@@ -54,8 +62,13 @@
           <label class="form-label fw-semibold" for="registro-documento">
             <i class="bi bi-person-vcard me-1" style="color:var(--sena-green)"></i>Número de Documento
           </label>
+<<<<<<< HEAD
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="registro-documento" class="form-control form-control-lg" name="documento"
                  placeholder="Ej: 1012345678" required autofocus>
+=======
+          <input type="number" id="registro-documento" class="form-control form-control-lg no-spinner" name="documento"
+                 required autofocus>
+>>>>>>> 20bb9d65683e8a185bb2be72afb1627ea89ee4e2
         </div>
 
         <div class="mb-3">
@@ -63,15 +76,20 @@
             <i class="bi bi-person me-1" style="color:var(--sena-green)"></i>Nombre Completo
           </label>
           <input type="text" id="registro-nombre" class="form-control form-control-lg" name="nombre"
-                 placeholder="Tu nombre" required>
+                 required>
         </div>
 
         <div class="mb-4">
           <label class="form-label fw-semibold" for="registro-ficha">
             <i class="bi bi-mortarboard me-1" style="color:var(--sena-green)"></i>Número de Ficha
           </label>
+<<<<<<< HEAD
           <input type="text" inputmode="numeric" pattern="[0-9]*" id="registro-ficha" class="form-control form-control-lg" name="ficha"
                  placeholder="Ej: 2895461" required>
+=======
+          <input type="number" id="registro-ficha" class="form-control form-control-lg no-spinner" name="ficha"
+                 required>
+>>>>>>> 20bb9d65683e8a185bb2be72afb1627ea89ee4e2
         </div>
 
         {# HU-65: consentimiento obligatorio, NO marcado por defecto (Ley 1581 de 2012) #}
@@ -106,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
   crownBtn.title     = 'Acceso Administrador';
   crownBtn.id        = 'adminCrownBtn';
   crownBtn.className = 'btn-admin-crown';
-  crownBtn.innerHTML = '<i class="bi bi-crown-fill"></i>';
+  crownBtn.innerHTML = '<img src="{{ url_for('static', filename='img/ingresar_logo.png') }}" alt="Acceso administrador">';
 
   // Lo insertamos justo antes del theme-toggle
   themeToggle.parentNode.insertBefore(crownBtn, themeToggle);
