@@ -10,8 +10,6 @@ services:
         required: false
     networks:
       - coolify
-    depends_on:
-      - redis
     logging:
       driver: json-file
       options:
@@ -23,24 +21,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  # HU-1 (auditoria 2026-08-23): backend compartido para Flask-Limiter,
-  # para que el conteo de intentos de login/recuperacion de clave sea el
-  # mismo sin importar que worker de Gunicorn atienda cada peticion. Solo
-  # guarda contadores de rate limiting (datos efimeros, no persistentes),
-  # por eso no necesita volumen.
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    networks:
-      - coolify
-    mem_limit: 128m
-    cpus: 0.25
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 networks:
   coolify:
