@@ -100,6 +100,7 @@
     width: 24px; height: 24px; line-height: 1; padding: 0; font-size: .85rem;
   }
   .pedido-vacio { padding: 2rem 1rem; text-align: center; color: #6c757d; }
+  .buscador-categoria { max-width: 520px; }
 </style>
 {% endblock %}
 
@@ -115,6 +116,14 @@
 
   <div class="row g-4">
     <div class="{% if es_cliente %}col-lg-8{% else %}col-lg-12{% endif %}">
+      <div class="input-group buscador-categoria mb-3">
+        <span class="input-group-text" style="background:var(--bg-card)">
+          <i class="bi bi-search text-muted"></i>
+        </span>
+        <label class="visually-hidden" for="buscador-categoria">Buscar producto</label>
+        <input type="search" id="buscador-categoria" class="form-control"
+               placeholder="Buscar producto en {{ categoria }}..." oninput="filtrarProductos()">
+      </div>
       <h4 class="fw-bold mb-3" style="color:var(--sena-green)">{{ categoria }}</h4>
 
       {% if not grupos %}
@@ -125,10 +134,11 @@
       {% endif %}
 
       {% for sub, items in grupos %}
+        <div class="subcategoria-grupo">
         {% if sub %}<div class="subcategoria-titulo">{{ sub }}</div>{% endif %}
         <div class="row g-3">
           {% for p in items %}
-          <div class="col-6 col-md-4">
+          <div class="col-6 col-md-4 producto-col" data-search="{{ (p.nombre ~ ' ' ~ categoria ~ ' ' ~ sub)|lower }}">
             <div class="producto-card-cat {% if p.stock == 0 %}opacity-50{% endif %}"
                  data-id="{{ p.idproducto }}" data-nombre="{{ p.nombre }}"
                  data-precio="{{ p.precio }}" data-stock="{{ p.stock }}"
@@ -156,7 +166,12 @@
           </div>
           {% endfor %}
         </div>
+        </div>
       {% endfor %}
+      <div id="sin-resultados" class="text-center text-muted py-5 d-none">
+        <i class="bi bi-search" style="font-size:2.5rem"></i>
+        <p class="mt-2">No se encontraron productos.</p>
+      </div>
     </div>
 
     {% if es_cliente %}
@@ -360,4 +375,26 @@ function mostrarAlerta(tipo, msg) {
 renderPedido();
 </script>
 {% endif %}
+<script>
+function filtrarProductos() {
+  const texto = quitarTildes(document.getElementById('buscador-categoria').value);
+  const productos = document.querySelectorAll('.producto-col');
+  let visibles = 0;
+
+  productos.forEach((producto) => {
+    const coincide = quitarTildes(producto.dataset.search).includes(texto);
+    producto.classList.toggle('d-none', !coincide);
+    if (coincide) visibles += 1;
+  });
+
+  document.querySelectorAll('.subcategoria-grupo').forEach((grupo) => {
+    grupo.classList.toggle('d-none', !grupo.querySelector('.producto-col:not(.d-none)'));
+  });
+  document.getElementById('sin-resultados').classList.toggle('d-none', visibles > 0);
+}
+
+function quitarTildes(texto) {
+  return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+</script>
 {% endblock %}
