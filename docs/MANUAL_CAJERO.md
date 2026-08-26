@@ -14,7 +14,7 @@ Abra **Dashboard** para consultar ventas del día, ventas recientes, productos c
 2. Revise el cliente, los productos, el valor y el estado del pedido.
 3. Para un pedido en `Pendiente de Pago`, seleccione **Aceptar** o **Rechazar**.
 4. Si lo rechaza, el sistema devuelve las unidades al stock.
-5. El avance a `Preparado` y `Entregado` corresponde al despachador o administrador.
+5. Puede marcar el pedido como `Preparado` o `Entregado` cuando el proceso de la cafetería lo requiera. El despachador solo puede marcarlo como `Entregado`.
 
 ## Consultar productos y compras
 

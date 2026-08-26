@@ -12,6 +12,7 @@ PERMISOS = {
         'ver_todo': True,
         'escribir_todo': True,
         'aceptar_rechazar_venta': True,
+        'marcar_preparado': True,
         'cambiar_estado_entrega': True,
         'generar_reporte': True,
         'ver_datos_personales': True,
@@ -27,6 +28,8 @@ PERMISOS = {
         'ver_todo': True,
         'escribir_todo': False,
         'aceptar_rechazar_venta': True,
+        'marcar_preparado': True,
+        'cambiar_estado_entrega': True,
         'generar_reporte': True,
         'ver_datos_personales': False,
         'paginas': ['dashboard', 'productos', 'ventas', 'compras', 'reportes'],
@@ -45,10 +48,11 @@ def tipo_usuario_actual():
     if not current_user.is_authenticated:
         return None
     rid = current_user.get_id()
-    if rid.startswith('admin:'):
-        return getattr(current_user, 'rol', None)
-    if rid.startswith('personal:'):
-        return getattr(current_user, 'rol', None)
+    if rid.startswith('admin:') or rid.startswith('personal:'):
+        rol = getattr(current_user, 'rol', None)
+        # Compatibilidad con cuentas antiguas creadas como entregador.
+        # El nombre actual del rol es despachador.
+        return 'despachador' if rol == 'entregador' else rol
     return None
 
 

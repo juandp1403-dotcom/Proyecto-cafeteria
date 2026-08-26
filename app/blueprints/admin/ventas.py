@@ -79,7 +79,7 @@ def _transicion_venta(idventa, estados_validos, estado_nuevo):
 def venta_aceptar(idventa):
     Venta.query.get_or_404(idventa)
     if _transicion_venta(idventa, 'Pendiente de Pago', 'Pagado/Preparando'):
-        flash(f'Pedido #{idventa} aceptado y en preparación.', 'success')
+        flash(f'Pago del pedido #{idventa} confirmado. El pedido pasó a preparación.', 'success')
     else:
         flash('Solo se pueden aceptar pedidos pendientes.', 'warning')
     return redirect(url_for('admin_panel.ventas', page=request.args.get('page', 1), periodo=request.args.get('periodo', 'todos')))
@@ -103,7 +103,7 @@ def venta_rechazar(idventa):
 
 @admin_bp.route('/ventas/preparado/<int:idventa>', methods=['POST'])
 @login_required
-@requiere_permiso('cambiar_estado_entrega')
+@requiere_permiso('marcar_preparado')
 def venta_preparado(idventa):
     Venta.query.get_or_404(idventa)
     if _transicion_venta(idventa, 'Pagado/Preparando', 'Preparado'):

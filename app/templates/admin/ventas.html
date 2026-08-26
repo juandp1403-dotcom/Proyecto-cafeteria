@@ -121,7 +121,7 @@
                 onsubmit="return confirm('¿Aceptar este pedido?')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="btn btn-sm btn-success">
-              <i class="bi bi-check-circle me-1"></i>Aceptar
+              <i class="bi bi-check-circle me-1"></i>Confirmar pago
             </button>
           </form>
           <form method="POST" action="{{ url_for('admin_panel.venta_rechazar', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
@@ -132,8 +132,9 @@
             </button>
           </form>
         </div>
-        {% elif v.estado == 'Pagado/Preparando' and puede('cambiar_estado_entrega') %}
+        {% elif v.estado == 'Pagado/Preparando' %}
         <div class="d-flex gap-2 mt-2">
+          {% if puede('marcar_preparado') %}
           <form method="POST" action="{{ url_for('admin_panel.venta_preparado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
                 onsubmit="return confirm('¿Marcar como preparado?')">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -141,6 +142,16 @@
               <i class="bi bi-hourglass-split me-1"></i>Marcar Preparado
             </button>
           </form>
+          {% endif %}
+          {% if puede('cambiar_estado_entrega') %}
+          <form method="POST" action="{{ url_for('admin_panel.venta_entregado', idventa=v.idventa, page=ventas.page, periodo=periodo) }}"
+                onsubmit="return confirm('¿Marcar como entregado?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-sm btn-success">
+              <i class="bi bi-bag-check me-1"></i>Marcar Entregado
+            </button>
+          </form>
+          {% endif %}
         </div>
         {% elif v.estado == 'Preparado' and puede('cambiar_estado_entrega') %}
         <div class="d-flex gap-2 mt-2">
