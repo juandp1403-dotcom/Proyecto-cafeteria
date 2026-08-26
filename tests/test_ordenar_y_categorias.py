@@ -17,7 +17,7 @@ import pytest
 from openpyxl import Workbook
 
 from app import create_app
-from app.models import db, Producto
+from app.models import Producto, db
 
 
 @pytest.fixture()
@@ -83,7 +83,10 @@ def test_supresion_registrada_redirige_a_ordenar(app, client):
     assert '/cliente/ordenar' in resp.headers['Location']
 
 
-def test_ordenar_muestra_link_al_catalogo_completo(app, client):
+def test_ordenar_no_muestra_link_al_catalogo_plano(app, client):
+    # Desde 3476131 el catalogo plano dejo de ser via de acceso para el
+    # cliente: Ordenar no debe enlazarlo (la ruta /cliente/catalogo sigue
+    # viva, pero sin entrada desde la UI).
     client.post('/cliente/registro', data={
         'documento': '506070800',   # dentro del rango int32 que valida la ruta
         'nombre': 'Cliente Link',
@@ -91,8 +94,8 @@ def test_ordenar_muestra_link_al_catalogo_completo(app, client):
         'autorizo_datos': 'on',
     })
     html = client.get('/cliente/ordenar').get_data(as_text=True)
-    assert 'Ver catálogo completo' in html
-    assert 'href="/cliente/catalogo"' in html
+    assert 'Ver catálogo completo' not in html
+    assert 'href="/cliente/catalogo"' not in html
 
 
 # ── Importador masivo: categoria y subcategoria ─────────────────────
@@ -175,21 +178,17 @@ def test_importador_sin_columnas_de_categoria_no_toca_las_existentes(app, client
         assert p.subcategoria == 'Dulces'
 
 
-# ── Aviso de productos sin categoria en el panel admin ──────────────
+# ── El banner de productos sin categoria fue retirado (3476131) ─────
 
-def test_panel_admin_cuenta_productos_sin_categoria(app, client):
+def test_panel_admin_no_muestra_aviso_de_sin_categoria(app, client):
+    # Desde 3476131 el catalogo plano ya no es via de acceso del cliente,
+    # asi que el aviso "N producto(s) sin categoría asignada" se retiro
+    # del panel. La pagina no debe volver a mostrarlo.
     _login_admin(client)
     with app.app_context():
-        base_sin = Producto.query.filter(
-            Producto.activo.is_(True), Producto.categoria.is_(None)
-        ).count()
-        db.session.add(Producto(nombre='Con Cat A', precio=1000, stock=5,
-                                costo=500, categoria='Bebidas'))
-        db.session.add(Producto(nombre='Con Cat B', precio=1000, stock=5,
-                                costo=500, categoria='Paquetes'))
         db.session.add(Producto(nombre='Sin Cat C', precio=1000, stock=5,
                                 costo=500))
         db.session.commit()
 
     html = client.get('/admin/productos').get_data(as_text=True)
-    assert f'{base_sin + 1} producto(s) sin categoría asignada' in html
+    assert 'sin categoría asignada' not in html
