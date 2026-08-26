@@ -61,9 +61,8 @@
               <div class="fw-semibold">{{ v.cliente_rel.nombre }}</div>
               <small class="text-muted">Doc: {{ v.cliente }} &middot; Ficha: {{ v.cliente_rel.ficha }}</small>
               {% else %}
-              {# HU-59: sin permiso ver_datos_personales solo se ven iniciales #}
-              <div class="fw-semibold">{{ iniciales(v.cliente_rel.nombre) if v.cliente_rel else '—' }}</div>
-              <small class="text-muted">Doc: {{ doc_enmascarado(v.cliente) }}</small>
+              <div class="fw-semibold">{{ v.cliente_rel.nombre if v.cliente_rel else '—' }}</div>
+              <small class="text-muted">Pedido #{{ v.numero_pedido_diario or v.idventa }}</small>
               {% endif %}
             </div>
           </div>

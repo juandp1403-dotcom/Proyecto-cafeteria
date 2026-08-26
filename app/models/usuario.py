@@ -6,7 +6,7 @@ from .base import db
 
 class Admin(UserMixin, db.Model):
     __tablename__ = 'admin'
-    documento = db.Column(db.Integer, primary_key=True)
+    documento = db.Column(db.BigInteger, primary_key=True)
     nombre    = db.Column(db.String(100), nullable=False)
     clave     = db.Column(db.String(256), nullable=False)
     email     = db.Column(db.String(120), unique=True, nullable=False)
@@ -28,7 +28,7 @@ class Admin(UserMixin, db.Model):
 
 class Personal(UserMixin, db.Model):
     __tablename__ = 'personal'
-    docpersonal = db.Column(db.Integer, primary_key=True)
+    docpersonal = db.Column(db.BigInteger, primary_key=True)
     nombre      = db.Column(db.String(50))
     clave       = db.Column(db.String(255))
     email       = db.Column(db.String(120))

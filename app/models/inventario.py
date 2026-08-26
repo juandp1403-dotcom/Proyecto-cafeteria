@@ -14,7 +14,7 @@ class BajaInventario(db.Model):
     # Filas legacy (tipo DATE) quedan con hora 00:00; ver _migrar_esquema.
     fecha      = db.Column(db.DateTime, default=ahora_bogota)
     # Admin o Personal; sin FK por ser tablas distintas.
-    usuario_documento = db.Column(db.Integer, nullable=True)
+    usuario_documento = db.Column(db.BigInteger, nullable=True)
     usuario_tipo      = db.Column(db.String(20), nullable=True)  # 'admin' | 'personal'
 
     producto = db.relationship('Producto', backref='bajas')

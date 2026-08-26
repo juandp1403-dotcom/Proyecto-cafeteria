@@ -10,7 +10,7 @@ class TokenPedido(db.Model):
     __tablename__ = 'tokenpedido'
     idtoken           = db.Column(db.Integer, primary_key=True)
     token             = db.Column(db.String(64), nullable=False, unique=True)
-    documento_cliente = db.Column(db.Integer, nullable=False)
+    documento_cliente = db.Column(db.BigInteger, nullable=False)
     usado             = db.Column(db.Boolean, nullable=False, default=False)
     creado            = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 

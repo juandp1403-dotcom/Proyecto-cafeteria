@@ -13,7 +13,10 @@ from . import admin_bp
 def compras():
     page    = request.args.get('page', 1, type=int)
     compras = (Compra.query
-               .options(db.joinedload(Compra.admin_rel))
+               .options(
+                   db.joinedload(Compra.admin_rel),
+                   db.joinedload(Compra.detalles).joinedload(DetalleCompra.producto),
+               )
                .order_by(Compra.fechacompra.desc())
                .paginate(page=page, per_page=20, error_out=False))
     productos = Producto.query.filter(Producto.activo.is_(True)).order_by(Producto.nombre).all()

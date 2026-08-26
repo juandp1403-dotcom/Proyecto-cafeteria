@@ -7,7 +7,7 @@ class SolicitudSupresion(db.Model):
     procesada manualmente por un admin."""
     __tablename__ = 'solicitudsupresion'
     idsolicitud       = db.Column(db.Integer, primary_key=True)
-    documento_cliente = db.Column(db.Integer, nullable=False)
+    documento_cliente = db.Column(db.BigInteger, nullable=False)
     nombre_cliente    = db.Column(db.String(100), nullable=True)
     motivo            = db.Column(db.String(500), nullable=True)
     fecha             = db.Column(db.DateTime, default=ahora_bogota)

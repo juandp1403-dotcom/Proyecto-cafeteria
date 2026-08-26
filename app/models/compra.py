@@ -10,7 +10,7 @@ class Compra(db.Model):
     # Timestamp completo: permite mostrar fecha y hora por separado.
     # Filas legacy (tipo DATE) quedan con hora 00:00; ver _migrar_esquema.
     fechacompra    = db.Column(db.DateTime, default=ahora_bogota)
-    documentoadmin = db.Column(db.Integer, db.ForeignKey('admin.documento'), nullable=False)
+    documentoadmin = db.Column(db.BigInteger, db.ForeignKey('admin.documento'), nullable=False)
 
     admin_rel = db.relationship('Admin',         back_populates='compras')
     detalles  = db.relationship('DetalleCompra', back_populates='compra_rel', cascade='all, delete-orphan')
