@@ -14,10 +14,8 @@ EXPOSE 5545
 CMD ["gunicorn", \
      "--bind", "0.0.0.0:5545", \
      "--workers", "4", \
-     "--worker-class", "sync", \
-     "--worker-connections", "1000", \
      "--timeout", "60", \
-     "--keepalive", "5", \
+     "--keep-alive", "5", \
      "--max-requests", "1000", \
      "--max-requests-jitter", "100", \
      "--access-logfile", "-", \
