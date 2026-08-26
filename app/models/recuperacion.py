@@ -11,7 +11,7 @@ class TokenRecuperacion(db.Model):
     __tablename__ = 'tokenrecuperacion'
     idtoken     = db.Column(db.Integer, primary_key=True)
     tipo_cuenta = db.Column(db.String(10), nullable=False)   # 'admin' o 'personal'
-    identificador = db.Column(db.Integer, nullable=False)    # documento / docpersonal
+    identificador = db.Column(db.BigInteger, nullable=False)    # documento / docpersonal
     token_hash  = db.Column(db.String(64), nullable=False, unique=True)
     creado      = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     expira      = db.Column(db.DateTime, nullable=False)

@@ -19,29 +19,84 @@
     </div>
   </div>
 
-  <div class="table-responsive">
-    <table class="table table-hover table-sena align-middle">
-      <thead>
-        <tr>
-          <th>ID</th><th>Vendedor</th><th>Fecha</th><th>Hora</th>
-          <th class="text-center">Total</th><th>Registrado por</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in compras.items %}
-        <tr>
-          <td class="text-muted small">{{ c.idcompra }}</td>
-          <td class="fw-semibold">{{ c.nombrevendedor }}</td>
-          <td class="small">{{ c.fechacompra.strftime('%d/%m/%Y') if c.fechacompra else '–' }}</td>
-          <td class="small">{{ c.fechacompra.strftime('%H:%M') if c.fechacompra else '–' }}</td>
-          <td class="text-center fw-semibold">${{ "{:,}".format(c.precio) }}</td>
-          <td>{{ c.admin_rel.nombre if c.admin_rel else '–' }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">Sin compras registradas</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="d-flex flex-column gap-2">
+    {% for c in compras.items %}
+    <div class="card" style="border-left:4px solid var(--sena-green)">
+      <div class="card-body py-2 px-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+
+          <!-- Info principal -->
+          <div class="d-flex align-items-center gap-3">
+            <div class="text-center" style="min-width:50px">
+              <div class="fw-bold fs-5" style="color:var(--sena-green)">#{{ c.idcompra }}</div>
+              <small class="text-muted">Compra</small>
+            </div>
+            <div>
+              <div class="fw-semibold">{{ c.nombrevendedor }}</div>
+              <small class="text-muted">
+                Registrado por: {{ c.admin_rel.nombre if c.admin_rel else '–' }}
+              </small>
+            </div>
+          </div>
+
+          <!-- Monto + fecha -->
+          <div class="text-end">
+            <div class="fw-bold fs-5" style="color:var(--sena-green)">${{ "{:,}".format(c.precio) }}</div>
+            <small class="text-muted">{{ c.fechacompra.strftime('%d/%m/%Y') if c.fechacompra else '–' }}</small><br>
+            <small class="text-muted">{{ c.fechacompra.strftime('%H:%M') if c.fechacompra else '' }}</small>
+          </div>
+        </div>
+
+        <!-- Botón para expandir detalle -->
+        <div class="mt-2">
+          <button class="btn btn-sm btn-outline-secondary py-0" type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#detalle-compra-{{ c.idcompra }}">
+            <i class="bi bi-list-ul me-1"></i>Ver productos ({{ c.detalles|length }})
+          </button>
+        </div>
+
+        <!-- Detalle colapsable -->
+        <div class="collapse mt-2" id="detalle-compra-{{ c.idcompra }}">
+          <table class="table table-sm table-sena mb-0">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-end">Subtotal pagado</th>
+                <th class="text-end">Costo unit.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in c.detalles %}
+              <tr>
+                <td>{{ d.producto.nombre if d.producto else 'N/A' }}</td>
+                <td class="text-center">{{ d.cantidad }}</td>
+                <td class="text-end">${{ "{:,}".format(d.subtotal) }}</td>
+                <td class="text-end text-muted">
+                  ${{ "{:,}".format((d.subtotal // d.cantidad) if d.cantidad else 0) }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr style="font-weight:700">
+                <td colspan="2" class="text-end">TOTAL COMPRA</td>
+                <td class="text-end" style="color:var(--sena-green)" colspan="2">
+                  ${{ "{:,}".format(c.precio) }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-inbox" style="font-size:3rem"></i>
+      <p class="mt-2">Sin compras registradas.</p>
+    </div>
+    {% endfor %}
   </div>
 
   {% if compras.pages > 1 %}

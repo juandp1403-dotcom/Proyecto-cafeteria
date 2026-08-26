@@ -4,7 +4,7 @@ from .base import db
 
 class Cliente(db.Model):
     __tablename__ = 'cliente'
-    documento = db.Column(db.Integer, primary_key=True)
+    documento = db.Column(db.BigInteger, primary_key=True)
     nombre    = db.Column(db.String(100), nullable=False)
     ficha     = db.Column(db.Integer, nullable=False)
 
@@ -15,7 +15,7 @@ class Venta(db.Model):
     __tablename__ = 'venta'
     idventa    = db.Column(db.Integer, primary_key=True)
     precio     = db.Column(db.Integer, nullable=False)
-    cliente    = db.Column(db.Integer, db.ForeignKey('cliente.documento'), nullable=False)
+    cliente    = db.Column(db.BigInteger, db.ForeignKey('cliente.documento'), nullable=False)
     fechaventa = db.Column(db.DateTime, default=ahora_bogota)
     estado     = db.Column(db.String(30), nullable=False, default='Pendiente de Pago')
     metodo_pago = db.Column(db.String(20), nullable=True)

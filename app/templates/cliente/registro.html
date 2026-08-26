@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
   crownBtn.title     = 'Acceso Administrador';
   crownBtn.id        = 'adminCrownBtn';
   crownBtn.className = 'btn-admin-crown';
-  crownBtn.innerHTML = '<img src="{{ url_for('static', filename='img/ingresar_logo.png') }}" alt="Acceso administrador">';
+  crownBtn.innerHTML = "<img src=\"{{ url_for('static', filename='img/ingresar_logo.png') }}\" alt=\"Acceso administrador\">";
 
   // Lo insertamos justo antes del theme-toggle
   themeToggle.parentNode.insertBefore(crownBtn, themeToggle);

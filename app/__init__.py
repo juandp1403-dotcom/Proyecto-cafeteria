@@ -1,25 +1,27 @@
-import os
 import logging
+import os
 import secrets
 from datetime import datetime
+
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect
 from flask_talisman import Talisman
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
-from config.config import config, _abrir_tunel, _construir_db_url
-from .models import db, Admin, Personal
+
+from .blueprints.permisos import registrar_context_processor
 from .extensions import limiter
+from .models import Admin, Personal, db
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
 
 
 def create_app(config_name='default'):
-    app = Flask(__name__)
+    from config.config import _abrir_tunel, _construir_db_url, config
+
+    app = Flask(__name__, static_folder='static', template_folder='templates')
     app.config.from_object(config[config_name])
-    app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
-    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'productos')
 
     if config_name == 'production':
         secret = app.config.get('SECRET_KEY') or ''
@@ -33,6 +35,9 @@ def create_app(config_name='default'):
                 "y configurala en SECRET_KEY."
             )
 
+    # Conexion a BD: tunel SSH (desarrollo contra la BD remota) o
+    # DATABASE_URL directa. En produccion no hay fallback efimero: si no
+    # hay BD configurada, mejor no arrancar.
     puerto = _abrir_tunel(config_name)
     if puerto:
         app.config['SQLALCHEMY_DATABASE_URI'] = _construir_db_url(puerto)
@@ -42,33 +47,38 @@ def create_app(config_name='default'):
                 "No hay conexion real a base de datos configurada (falta SSH_HOST "
                 "para el tunel, o DATABASE_URL). En produccion la app no puede "
                 "arrancar con SQLite efimero: los datos se perderian en cada "
-                "reinicio del contenedor. Configura las variables de entorno "
-                "necesarias antes de desplegar (ver .env.example)."
+                "reinicio del contenedor."
             )
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafeteria.db'
 
+    # Extensiones
     db.init_app(app)
+    login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
-    login_manager.init_app(app)
+
+    # Flask-Login
     login_manager.login_view = 'empleados.login'
     login_manager.login_message = 'Inicia sesión para continuar.'
     login_manager.login_message_category = 'warning'
     login_manager.session_protection = 'strong'
 
+    # Talisman solo en producción para no romper el desarrollo local
     if config_name == 'production':
-        # Coolify termina el TLS y reenvia por HTTP interno.
+        # Coolify termina el TLS y reenvia por HTTP interno: sin ProxyFix
+        # todas las peticiones llegan con la IP del proxy y el esquema
+        # http, rompiendo el rate limiting por IP y las URLs externas.
         app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
         Talisman(
             app,
-            force_https=False,  # el proxy reverso ya termina el TLS
+            force_https=False,          # Coolify/Traefik ya maneja HTTPS
             strict_transport_security=True,
             content_security_policy={
                 'default-src': "'self'",
                 'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
                 'style-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-                'img-src': ["'self'", 'data:'],
+                'img-src': ["'self'", "'data:'"],
                 'font-src': ["'self'", 'https://cdn.jsdelivr.net'],
             },
             session_cookie_secure=True,
@@ -81,34 +91,40 @@ def create_app(config_name='default'):
         app.logger.handlers = [handler]
         app.logger.setLevel(logging.INFO)
 
-    from .blueprints.cliente   import cliente_bp
+    # Blueprints
+    from .blueprints.admin import admin_bp
+    from .blueprints.cliente import cliente_bp
     from .blueprints.empleados import empleados_bp
-    from .blueprints.admin     import admin_bp
-    from .blueprints.permisos  import registrar_context_processor
 
     app.register_blueprint(cliente_bp)
     app.register_blueprint(empleados_bp)
     app.register_blueprint(admin_bp)
 
+    # Ruta raíz
+    @app.route('/')
+    def index():
+        return redirect(url_for('cliente.registro'))
+
+    # Healthcheck para Coolify
+    @app.route('/healthz')
+    def healthz():
+        return 'ok', 200
+
+    # Context processors de permisos
     registrar_context_processor(app)
 
     @app.context_processor
     def inject_anio_actual():
         return dict(anio_actual=datetime.utcnow().year)
 
-    @app.route('/')
-    def index():
-        return redirect(url_for('cliente.registro'))
-
-    @app.route('/healthz')
-    def healthz():
-        return {'status': 'ok'}, 200
-
+    # Crear tablas si no existen
     with app.app_context():
         db.create_all()
         _migrar_esquema()
-        # Los datos iniciales se cargan solo cuando se solicita expresamente.
-        # Asi un reinicio no crea inventario ni cuentas/roles por defecto.
+        # Los datos iniciales se cargan solo cuando se solicita
+        # expresamente (SEED_INITIAL_DATA): un reinicio no crea inventario
+        # ni cuentas/roles por defecto. conftest.py activa la variable
+        # durante las pruebas.
         if os.environ.get('SEED_INITIAL_DATA', '').strip().lower() in ('1', 'true', 'si', 'yes'):
             _seed_datos_iniciales(config_name)
             _seed_catalogo_categorizado()
@@ -118,18 +134,20 @@ def create_app(config_name='default'):
 
 @login_manager.user_loader
 def load_user(user_id):
-    if ':' in user_id:
-        tipo, doc = user_id.split(':', 1)
-        if tipo == 'admin':
-            user = Admin.query.get(int(doc))
-        elif tipo == 'personal':
-            user = Personal.query.get(int(doc))
-        else:
-            return None
-        if user is not None and not getattr(user, 'activo', True):
-            return None
-        return user
-    return None
+    if not user_id:
+        return None
+    if user_id.startswith('admin:'):
+        doc = int(user_id.split(':')[1])
+        user = Admin.query.get(doc)
+    elif user_id.startswith('personal:'):
+        doc = int(user_id.split(':')[1])
+        user = Personal.query.get(doc)
+    else:
+        return None
+    # HU-36: una cuenta desactivada no conserva sesion activa.
+    if user is not None and not getattr(user, 'activo', True):
+        return None
+    return user
 
 
 def _ejecutar_migracion(ddl):
@@ -174,9 +192,6 @@ def _migrar_esquema():
     if es_pg:
         _ejecutar_migracion("ALTER TABLE admin ALTER COLUMN clave TYPE VARCHAR(256)")
         _ejecutar_migracion("ALTER TABLE venta ALTER COLUMN fechaventa TYPE TIMESTAMP USING fechaventa::timestamp")
-        # Bajas de inventario y compras pasaron de DATE a TIMESTAMP (fecha
-        # y hora); en SQLite no hace falta DDL (tipado dinamico) y las
-        # filas legacy quedan con hora 00:00.
         _ejecutar_migracion("ALTER TABLE bajainventario ALTER COLUMN fecha TYPE TIMESTAMP USING fecha::timestamp")
         _ejecutar_migracion("ALTER TABLE compra ALTER COLUMN fechacompra TYPE TIMESTAMP USING fechacompra::timestamp")
         _ejecutar_migracion("UPDATE admin SET rol = 'despachador' WHERE rol = 'entregador'")
@@ -194,26 +209,19 @@ def _migrar_esquema():
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idventa ON detalleventa (idventa)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detalleventa_idproducto ON detalleventa (idproducto)")
         _ejecutar_migracion("CREATE INDEX IF NOT EXISTS idx_detallecompra_idcompra ON detallecompra (idcompra)")
-        # 'preciou' es una columna huerfana en la BD real (no existe en el
-        # modelo ni en el historial de git); bloqueaba cualquier insert nuevo.
-        # Se verifica que exista antes de intentar el ALTER, para no
-        # registrar un warning en cada arranque en las bases que nunca
-        # tuvieron esa columna.
+        # 'preciou' es una columna huerfana historica: solo soltar el NOT
+        # NULL si existe, para no registrar warning en bases que nunca la
+        # tuvieron.
         if columna_existe('detalleventa', 'preciou'):
             _ejecutar_migracion("ALTER TABLE detalleventa ALTER COLUMN preciou DROP NOT NULL")
-        # Race condition entre workers de gunicorn al sembrar el catalogo
-        # (ver _seed_catalogo_categorizado) dejo productos duplicados por
-        # nombre en la BD real. Se borra el duplicado mas reciente de
-        # cada par antes de poner el indice unico que evita que vuelva a pasar.
+        # Race condition entre workers al sembrar catalogo: borrar el
+        # duplicado mas reciente antes del indice unico.
         _ejecutar_migracion("""
             DELETE FROM producto p1
             USING producto p2
             WHERE p1.idproducto > p2.idproducto AND p1.nombre = p2.nombre
         """)
 
-    # Indice unico (sintaxis portable Postgres/SQLite) para que la
-    # restriccion la aplique la BD, no una lectura-y-escritura en Python
-    # que puede pisarse entre workers concurrentes.
     _ejecutar_migracion("CREATE UNIQUE INDEX IF NOT EXISTS idx_producto_nombre_unico ON producto (nombre)")
 
     agregar_columna('producto', 'imagen',
@@ -247,7 +255,6 @@ def _migrar_esquema():
                     "ALTER TABLE venta ADD COLUMN IF NOT EXISTS numero_pedido_diario INTEGER",
                     "ALTER TABLE venta ADD COLUMN numero_pedido_diario INTEGER")
     if es_pg:
-        # Backfill del consecutivo diario; en SQLite no hay datos legacy que rellenar.
         _ejecutar_migracion("""
             UPDATE venta SET numero_pedido_diario = sub.n
             FROM (
@@ -257,17 +264,12 @@ def _migrar_esquema():
             WHERE venta.idventa = sub.idventa AND venta.numero_pedido_diario IS NULL
         """)
 
-    agregar_columna(
-        'detalleventa', 'precio_unitario',
-        "ALTER TABLE detalleventa ADD COLUMN IF NOT EXISTS precio_unitario INT NOT NULL DEFAULT 0",
-        "ALTER TABLE detalleventa ADD COLUMN precio_unitario INT NOT NULL DEFAULT 0",
-    )
-    agregar_columna(
-        'detallecompra', 'subtotal',
-        "ALTER TABLE detallecompra ADD COLUMN IF NOT EXISTS subtotal INT NOT NULL DEFAULT 0",
-        "ALTER TABLE detallecompra ADD COLUMN subtotal INT NOT NULL DEFAULT 0",
-    )
-    # Backfill de filas legacy con el precio actual del producto.
+    agregar_columna('detalleventa', 'precio_unitario',
+                    "ALTER TABLE detalleventa ADD COLUMN IF NOT EXISTS precio_unitario INT NOT NULL DEFAULT 0",
+                    "ALTER TABLE detalleventa ADD COLUMN precio_unitario INT NOT NULL DEFAULT 0")
+    agregar_columna('detallecompra', 'subtotal',
+                    "ALTER TABLE detallecompra ADD COLUMN IF NOT EXISTS subtotal INT NOT NULL DEFAULT 0",
+                    "ALTER TABLE detallecompra ADD COLUMN subtotal INT NOT NULL DEFAULT 0")
     _ejecutar_migracion(
         "UPDATE detalleventa SET precio_unitario = "
         "COALESCE((SELECT p.precio FROM producto p WHERE p.idproducto = detalleventa.idproducto), 0) "
@@ -330,25 +332,23 @@ def _clave_seed(env_var, default_dev, config_name):
 
 
 def _seed_datos_iniciales(config_name='development'):
-    from .models import Admin, Producto
     from werkzeug.security import generate_password_hash
+
+    from .models import Admin, Producto
 
     documentos_existentes = {a.documento for a in Admin.query.with_entities(Admin.documento).all()}
     correos_existentes = {a.email for a in Admin.query.with_entities(Admin.email).all()}
 
     def _agregar_admin_seed(documento, nombre, email, clave_plana, rol):
-        # HU-70: antes solo se validaba el documento -- si el correo ya
-        # existia en OTRA cuenta (email tiene UNIQUE), el INSERT fallaba
-        # con IntegrityError durante el autoflush del Producto.query.first()
-        # de mas abajo, tumbando el arranque completo del worker (el
-        # try/except de mas abajo nunca llegaba a proteger este INSERT).
+        # HU-70: validar tambien el correo -- si ya existe en OTRA cuenta
+        # (email UNIQUE), el INSERT fallaba con IntegrityError durante un
+        # autoflush posterior y tumbaba el arranque del worker.
         if documento in documentos_existentes:
             return
         if email in correos_existentes:
             print(f"[seed] ADVERTENCIA: no se creo la cuenta '{nombre}' "
                   f"(documento={documento}) porque el correo '{email}' ya "
-                  f"esta en uso por otra cuenta. Ajusta la variable de "
-                  f"entorno correspondiente o revisa la cuenta existente.")
+                  f"esta en uso por otra cuenta.")
             return
         db.session.add(Admin(
             documento=documento, nombre=nombre, email=email,
@@ -378,10 +378,6 @@ def _seed_datos_iniciales(config_name='development'):
         'despachador',
     )
 
-    # Commit aparte (no combinado con el seed de productos de abajo): asi
-    # el autoflush de la consulta Producto.query.first() nunca encuentra
-    # estos INSERT todavia pendientes, y si de verdad fallaran, quedan
-    # protegidos por su propio try/except en vez de tumbar el arranque.
     from sqlalchemy.exc import IntegrityError
     try:
         db.session.commit()
@@ -404,26 +400,18 @@ def _seed_datos_iniciales(config_name='development'):
         ]
         db.session.add_all(productos)
 
-    from sqlalchemy.exc import IntegrityError
     try:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
 
 
-# Los productos legacy (Almuerzo Completo, Sanduche de Pollo, etc.) se
-# dejan sin categoria a proposito: la vista "Ordenar" solo debe mostrar
-# los 2 productos por categoria definidos en CATALOGO_SEED.
-
-
 def _seed_catalogo_categorizado():
-    """Inserta el catalogo de 2 productos por categoria si aun no
-    existen. Commit individual por item (no uno solo al final): con
-    varios workers de gunicorn arrancando a la vez, la unica fuente de
-    verdad real es la restriccion UNIQUE de producto.nombre en la BD
-    -- el chequeo previo por nombre es solo para evitar una consulta
-    redundante, no para prevenir la condicion de carrera."""
+    """Inserta el catalogo base si aun no existen. Commit individual por
+    item: con varios workers arrancando a la vez, la fuente de verdad es
+    la restriccion UNIQUE de producto.nombre en la BD."""
     from sqlalchemy.exc import IntegrityError
+
     from .catalogo_seed import CATALOGO_SEED
     from .models import Producto
 
@@ -440,8 +428,3 @@ def _seed_catalogo_categorizado():
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-
-
-if __name__ == '__main__':
-    app = create_app('development')
-    app.run(debug=True, host='0.0.0.0', port=5545)

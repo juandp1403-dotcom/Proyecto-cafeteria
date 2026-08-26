@@ -27,6 +27,16 @@
     </div>
   </div>
 
+  <div class="mb-3">
+    <input
+      type="text"
+      id="buscadorProductos"
+      class="form-control"
+      placeholder="Buscar producto por nombre..."
+      autocomplete="off"
+    >
+  </div>
+
   <div class="table-responsive">
     <table class="table table-hover table-sena align-middle">
       <thead>
@@ -307,5 +317,20 @@ function abrirBaja(id, nombre, stock) {
   form.querySelector('[name=motivo]').value = '';
   new bootstrap.Modal('#modalBaja').show();
 }
+</script>
+
+<script>
+(function () {
+  const input = document.getElementById('buscadorProductos');
+  if (!input) return;
+  input.addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(function (fila) {
+      const nombre = fila.querySelector('td.fw-semibold');
+      if (!nombre) return;
+      fila.style.display = (!q || nombre.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+  });
+})();
 </script>
 {% endblock %}

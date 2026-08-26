@@ -54,7 +54,7 @@ def registro():
         try:
             doc   = int(doc)
             ficha = int(ficha)
-            if not (0 < doc <= 2_147_483_647) or not (0 < ficha <= 2_147_483_647):
+            if not (0 < doc <= 9_999_999_999) or not (0 < ficha <= 2_147_483_647):
                 raise ValueError
         except ValueError:
             return render_template('cliente/registro.html', error='Documento y ficha deben ser numéricos válidos.')
