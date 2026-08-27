@@ -45,7 +45,7 @@
   <!-- Lista de pedidos -->
   <div class="d-flex flex-column gap-2">
     {% for v in ventas.items %}
-    <div class="card" style="border-left:4px solid {% if v.estado == 'Pendiente de Pago' %}#f0ad4e{% elif v.estado == 'Pagado/Preparando' %}#17a2b8{% elif v.estado == 'Entregado' %}var(--sena-green){% else %}#dc3545{% endif %}">
+    <div class="card pedido-card" data-pedido-id="{{ v.idventa }}" data-pedido-estado="{{ v.estado }}" style="border-left:4px solid {% if v.estado == 'Pendiente de Pago' %}#f0ad4e{% elif v.estado == 'Pagado/Preparando' %}#17a2b8{% elif v.estado == 'Entregado' %}var(--sena-green){% else %}#dc3545{% endif %}">
       <div class="card-body py-2 px-3">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <!-- Info principal -->
@@ -202,9 +202,8 @@
 </div>
 
 <script>
-// Auto-actualiza la vista de ventas cuando llega un pedido nuevo, sin
-// que el cajero tenga que recargar la pagina a mano. Mismo patron de
-// polling liviano que ya usa cliente/estado_pedido.html (HU-26).
+// Auto-actualiza la vista cuando llega un pedido nuevo o cambia su estado,
+// sin que el cajero tenga que recargar la pagina a mano.
 (function () {
   let ultimoIdConocido = {{ ultimo_id|tojson }};
 
@@ -220,14 +219,18 @@
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return;
-        if (data.ultimo_id > ultimoIdConocido) {
+        const cambioEstado = Object.entries(data.estados || {}).some(([id, estado]) => {
+          const tarjeta = document.querySelector(`[data-pedido-id="${id}"]`);
+          return tarjeta && tarjeta.dataset.pedidoEstado !== estado;
+        });
+        if (data.ultimo_id > ultimoIdConocido || cambioEstado) {
           location.reload();
         }
       })
       .catch(() => {});
   }
 
-  setInterval(consultarNuevasVentas, 10000);
+  setInterval(consultarNuevasVentas, 5000);
 })();
 </script>
 {% endblock %}

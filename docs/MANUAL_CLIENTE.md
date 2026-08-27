@@ -36,6 +36,8 @@ Estados posibles:
 - `Entregado`: el pedido fue entregado.
 - `Cancelado`: el pedido fue cancelado.
 
+Un pedido que permanezca en `Pendiente de Pago` durante 20 minutos se cancela automaticamente y las unidades reservadas se devuelven al stock.
+
 La pantalla de estado se actualiza automaticamente mientras el pedido avanza.
 
 ## 4. Cancelar un pedido

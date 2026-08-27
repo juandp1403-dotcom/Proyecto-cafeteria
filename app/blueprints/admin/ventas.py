@@ -53,12 +53,15 @@ def ventas():
 @requiere_ver_pagina('ventas')
 def ventas_ultimo_json():
     """Endpoint liviano para que la vista de ventas se auto-actualice.
-    Devuelve solo el id de la venta mas reciente que exista en el sistema
-    (sin importar el filtro de periodo que este usando la pantalla) para
-    que el frontend detecte si aparecio un pedido nuevo desde que cargo
-    la pagina."""
+    Devuelve el id de la venta mas reciente y los estados actuales para que
+    el frontend detecte pedidos nuevos o cambios de estado sin recargar a
+    mano."""
     ultima = Venta.query.order_by(Venta.idventa.desc()).first()
-    return jsonify({'ultimo_id': ultima.idventa if ultima else 0})
+    estados = dict(Venta.query.with_entities(Venta.idventa, Venta.estado).all())
+    return jsonify({
+        'ultimo_id': ultima.idventa if ultima else 0,
+        'estados': estados,
+    })
 
 
 def _transicion_venta(idventa, estados_validos, estado_nuevo):

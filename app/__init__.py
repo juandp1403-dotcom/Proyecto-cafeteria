@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .blueprints.permisos import registrar_context_processor
 from .extensions import limiter
-from .models import Admin, Personal, db
+from .models import Admin, Personal, cancelar_pedidos_expirados, db
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
@@ -109,6 +109,15 @@ def create_app(config_name='default'):
     @app.route('/healthz')
     def healthz():
         return 'ok', 200
+
+    @app.before_request
+    def expirar_pedidos_pendientes():
+        """Libera pedidos sin pago confirmado despues de 20 minutos."""
+        try:
+            cancelar_pedidos_expirados()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception('No se pudieron cancelar pedidos expirados')
 
     # Context processors de permisos
     registrar_context_processor(app)

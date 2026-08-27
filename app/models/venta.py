@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from ..utils import ahora_bogota
 from .base import db
+from .producto import ajustar_stock
 
 
 class Cliente(db.Model):
@@ -58,3 +61,29 @@ class DetalleVenta(db.Model):
             'cantidad':        self.cantidad,
             'subtotal':        self.precio_historico * self.cantidad
         }
+
+
+def cancelar_pedidos_expirados(minutos=20):
+    """Cancela pedidos pendientes vencidos y devuelve su stock."""
+    limite = ahora_bogota() - timedelta(minutes=minutos)
+    pendientes = Venta.query.filter(
+        Venta.estado == 'Pendiente de Pago',
+        Venta.fechaventa <= limite,
+    ).all()
+    cancelados = 0
+
+    for venta in pendientes:
+        detalles = list(venta.detalles)
+        afectadas = Venta.query.filter(
+            Venta.idventa == venta.idventa,
+            Venta.estado == 'Pendiente de Pago',
+        ).update({'estado': 'Cancelado'}, synchronize_session=False)
+        if not afectadas:
+            continue
+        for detalle in detalles:
+            ajustar_stock(detalle.idproducto, detalle.cantidad)
+        cancelados += 1
+
+    if cancelados:
+        db.session.commit()
+    return cancelados

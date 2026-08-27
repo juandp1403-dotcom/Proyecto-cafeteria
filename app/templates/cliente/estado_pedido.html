@@ -47,7 +47,7 @@
 
 {% block extra_js %}
 <script>
-// HU-26: polling de bajo costo -- consulta el estado cada 8s (limite
+// HU-26: polling de bajo costo -- consulta el estado cada 5s (limite
 // razonable, no cada segundo) y actualiza la pantalla sin recargar.
 // Se detiene solo al llegar a un estado final (Entregado/Cancelado).
 (function () {
@@ -88,7 +88,7 @@
       .catch(() => {});
   }
 
-  const intervalo = setInterval(consultarEstado, 8000);
+  const intervalo = setInterval(consultarEstado, 5000);
 })();
 </script>
 {% endblock %}

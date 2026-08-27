@@ -1,6 +1,6 @@
 from .base import db, expr_fecha
 from .producto import Producto, ajustar_stock
-from .venta import Cliente, Venta, DetalleVenta
+from .venta import Cliente, Venta, DetalleVenta, cancelar_pedidos_expirados
 from .compra import Compra, DetalleCompra
 from .inventario import BajaInventario
 from .usuario import Admin, Personal
@@ -17,7 +17,7 @@ from .pedido_token import TokenPedido, crear_token_pedido, consumir_token_pedido
 __all__ = [
     'db', 'expr_fecha',
     'Producto', 'ajustar_stock',
-    'Cliente', 'Venta', 'DetalleVenta',
+    'Cliente', 'Venta', 'DetalleVenta', 'cancelar_pedidos_expirados',
     'Compra', 'DetalleCompra',
     'BajaInventario',
     'Admin', 'Personal',
