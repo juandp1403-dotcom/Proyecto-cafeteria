@@ -5,6 +5,7 @@ import os
 import shutil
 import unicodedata
 import uuid
+from werkzeug.utils import secure_filename
 from ...models import db, expr_fecha, Producto, BajaInventario, ajustar_stock, registrar_auditoria
 from ...models.producto import CATEGORIAS
 from ..permisos import requiere_permiso, requiere_ver_pagina
@@ -143,15 +144,17 @@ def producto_nuevo():
         imagen = _save_image(new_image)
     else:
         lib_image = request.form.get('imagen_biblioteca', '').strip()
+        safe_lib_image = secure_filename(lib_image)
         # Solo se permite copiar un nombre que realmente este en la
         # biblioteca, para evitar un path traversal via ese campo.
-        if lib_image and lib_image in _get_library_images():
-            lib_path = os.path.join(_library_dir(), lib_image)
-            if os.path.exists(lib_path):
+        if lib_image and safe_lib_image == lib_image and safe_lib_image in _get_library_images():
+            library_root = os.path.realpath(_library_dir())
+            lib_path = os.path.realpath(os.path.join(library_root, safe_lib_image))
+            if os.path.commonpath([library_root, lib_path]) == library_root and os.path.exists(lib_path):
                 dest_dir = current_app.config['UPLOAD_FOLDER']
                 os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
-                imagen = lib_image
+                shutil.copy2(lib_path, os.path.join(dest_dir, safe_lib_image))
+                imagen = safe_lib_image
     es_especial = request.form.get('es_especial') == '1'
     categoria = request.form.get('categoria', '').strip() or None
     subcategoria = request.form.get('subcategoria', '').strip() or None
