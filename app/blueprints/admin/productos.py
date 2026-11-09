@@ -207,8 +207,9 @@ def producto_editar(idproducto):
     else:
         lib_image = request.form.get('imagen_biblioteca', '').strip()
         if lib_image and lib_image in _get_library_images():
-            lib_path = os.path.join(_library_dir(), lib_image)
-            if os.path.exists(lib_path):
+            base_dir = os.path.realpath(_library_dir())
+            lib_path = os.path.realpath(os.path.join(base_dir, lib_image))
+            if os.path.commonpath([base_dir, lib_path]) == base_dir and os.path.isfile(lib_path):
                 dest_dir = current_app.config['UPLOAD_FOLDER']
                 os.makedirs(dest_dir, exist_ok=True)
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
