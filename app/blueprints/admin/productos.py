@@ -157,10 +157,11 @@ def producto_nuevo():
             if lib_path and os.path.exists(lib_path):
                 dest_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
                 os.makedirs(dest_dir, exist_ok=True)
-                dest_path = os.path.abspath(os.path.normpath(os.path.join(dest_dir, lib_image)))
+                safe_filename = os.path.basename(lib_path)
+                dest_path = os.path.abspath(os.path.normpath(os.path.join(dest_dir, safe_filename)))
                 if os.path.commonpath([dest_dir, dest_path]) == dest_dir:
                     shutil.copy2(lib_path, dest_path)
-                    imagen = lib_image
+                    imagen = safe_filename
     es_especial = request.form.get('es_especial') == '1'
     categoria = request.form.get('categoria', '').strip() or None
     subcategoria = request.form.get('subcategoria', '').strip() or None
