@@ -206,14 +206,15 @@ def producto_editar(idproducto):
         prod.imagen = _save_image(new_image)
     else:
         lib_image = request.form.get('imagen_biblioteca', '').strip()
-        if lib_image and lib_image in _get_library_images():
+        safe_lib_image = os.path.basename(lib_image)
+        if lib_image and safe_lib_image == lib_image and safe_lib_image in _get_library_images():
             base_dir = os.path.realpath(_library_dir())
-            lib_path = os.path.realpath(os.path.join(base_dir, lib_image))
+            lib_path = os.path.realpath(os.path.join(base_dir, safe_lib_image))
             if os.path.commonpath([base_dir, lib_path]) == base_dir and os.path.isfile(lib_path):
                 dest_dir = current_app.config['UPLOAD_FOLDER']
                 os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
-                prod.imagen = lib_image
+                shutil.copy2(lib_path, os.path.join(dest_dir, safe_lib_image))
+                prod.imagen = safe_lib_image
     db.session.commit()
     detalle = f'precio {precio_anterior}->{nuevo_precio}' if precio_anterior != nuevo_precio else None
     registrar_auditoria(current_user.email, 'editar_producto', f'producto:{idproducto}', detalle)
