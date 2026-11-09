@@ -53,13 +53,18 @@ def _save_image(file_storage):
         return None
     ext = file_storage.filename.rsplit('.', 1)[1].lower()
     filename = f"{uuid.uuid4().hex[:12]}.{ext}"
-    upload_dir = current_app.config['UPLOAD_FOLDER']
+    upload_dir = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
     os.makedirs(upload_dir, exist_ok=True)
-    file_storage.save(os.path.join(upload_dir, filename))
+
+    dest_path = os.path.realpath(os.path.join(upload_dir, filename))
+    if not (dest_path == upload_dir or dest_path.startswith(upload_dir + os.sep)):
+        return None
+
+    file_storage.save(dest_path)
     # Copiar a biblioteca para reutilización futura
     lib_dir = _library_dir()
     os.makedirs(lib_dir, exist_ok=True)
-    shutil.copy2(os.path.join(upload_dir, filename), os.path.join(lib_dir, filename))
+    shutil.copy2(dest_path, os.path.join(lib_dir, filename))
     return filename
 
 
