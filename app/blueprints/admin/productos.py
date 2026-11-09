@@ -145,13 +145,23 @@ def producto_nuevo():
         lib_image = request.form.get('imagen_biblioteca', '').strip()
         # Solo se permite copiar un nombre que realmente este en la
         # biblioteca, para evitar un path traversal via ese campo.
-        if lib_image and lib_image in _get_library_images():
-            lib_path = os.path.join(_library_dir(), lib_image)
-            if os.path.exists(lib_path):
-                dest_dir = current_app.config['UPLOAD_FOLDER']
+        if lib_image:
+            library_root = os.path.abspath(_library_dir())
+            allowed_images = {}
+            for image_name in _get_library_images():
+                candidate_path = os.path.abspath(os.path.normpath(os.path.join(library_root, image_name)))
+                if os.path.commonpath([library_root, candidate_path]) == library_root:
+                    allowed_images[image_name] = candidate_path
+
+            lib_path = allowed_images.get(lib_image)
+            if lib_path and os.path.exists(lib_path):
+                dest_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
                 os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
-                imagen = lib_image
+                safe_filename = os.path.basename(lib_path)
+                dest_path = os.path.abspath(os.path.normpath(os.path.join(dest_dir, safe_filename)))
+                if os.path.commonpath([dest_dir, dest_path]) == dest_dir:
+                    shutil.copy2(lib_path, dest_path)
+                    imagen = safe_filename
     es_especial = request.form.get('es_especial') == '1'
     categoria = request.form.get('categoria', '').strip() or None
     subcategoria = request.form.get('subcategoria', '').strip() or None
