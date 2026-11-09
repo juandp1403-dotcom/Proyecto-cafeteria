@@ -21,6 +21,28 @@ def _allowed_image(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _trusted_image_extension(file_storage):
+    """Obtiene una extensión canónica basada en el contenido real de la imagen."""
+    format_to_ext = {
+        'JPEG': 'jpg',
+        'PNG': 'png',
+        'GIF': 'gif',
+        'WEBP': 'webp',
+    }
+    try:
+        file_storage.stream.seek(0)
+        img = Image.open(file_storage.stream)
+        fmt = (img.format or '').upper()
+    except Exception:
+        return None
+    finally:
+        file_storage.stream.seek(0)
+    ext = format_to_ext.get(fmt)
+    if ext in ALLOWED_EXTENSIONS:
+        return ext
+    return None
+
+
 def _es_imagen_valida(file_storage):
     """Verifica que el archivo sea realmente una imagen (no solo la
     extension) y que sus dimensiones no sean excesivas."""
@@ -51,7 +73,9 @@ def _save_image(file_storage):
         return None
     if not _es_imagen_valida(file_storage):
         return None
-    ext = file_storage.filename.rsplit('.', 1)[1].lower()
+    ext = _trusted_image_extension(file_storage)
+    if not ext:
+        return None
     filename = f"{uuid.uuid4().hex[:12]}.{ext}"
     upload_dir = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_dir, exist_ok=True)
