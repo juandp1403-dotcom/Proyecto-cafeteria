@@ -206,15 +206,17 @@ def producto_editar(idproducto):
         prod.imagen = _save_image(new_image)
     else:
         lib_image = request.form.get('imagen_biblioteca', '').strip()
-        if lib_image and lib_image in _get_library_images():
+        if lib_image:
             safe_lib_image = os.path.basename(lib_image)
-            library_root = os.path.realpath(_library_dir())
-            lib_path = os.path.realpath(os.path.join(library_root, safe_lib_image))
-            if os.path.commonpath([library_root, lib_path]) == library_root and os.path.exists(lib_path):
-                dest_dir = current_app.config['UPLOAD_FOLDER']
-                os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy2(lib_path, os.path.join(dest_dir, safe_lib_image))
-                prod.imagen = safe_lib_image
+            allowed_library_images = {os.path.basename(img) for img in _get_library_images()}
+            if safe_lib_image in allowed_library_images:
+                library_root = os.path.realpath(_library_dir())
+                lib_path = os.path.realpath(os.path.join(library_root, safe_lib_image))
+                if os.path.commonpath([library_root, lib_path]) == library_root and os.path.exists(lib_path):
+                    dest_dir = current_app.config['UPLOAD_FOLDER']
+                    os.makedirs(dest_dir, exist_ok=True)
+                    shutil.copy2(lib_path, os.path.join(dest_dir, safe_lib_image))
+                    prod.imagen = safe_lib_image
     db.session.commit()
     detalle = f'precio {precio_anterior}->{nuevo_precio}' if precio_anterior != nuevo_precio else None
     registrar_auditoria(current_user.email, 'editar_producto', f'producto:{idproducto}', detalle)
