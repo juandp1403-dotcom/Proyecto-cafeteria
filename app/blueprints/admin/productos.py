@@ -145,10 +145,16 @@ def producto_nuevo():
         lib_image = request.form.get('imagen_biblioteca', '').strip()
         # Solo se permite copiar un nombre que realmente este en la
         # biblioteca, para evitar un path traversal via ese campo.
-        if lib_image and lib_image in _get_library_images():
+        if lib_image:
             library_root = os.path.abspath(_library_dir())
-            lib_path = os.path.abspath(os.path.normpath(os.path.join(library_root, lib_image)))
-            if os.path.commonpath([library_root, lib_path]) == library_root and os.path.exists(lib_path):
+            allowed_images = {}
+            for image_name in _get_library_images():
+                candidate_path = os.path.abspath(os.path.normpath(os.path.join(library_root, image_name)))
+                if os.path.commonpath([library_root, candidate_path]) == library_root:
+                    allowed_images[image_name] = candidate_path
+
+            lib_path = allowed_images.get(lib_image)
+            if lib_path and os.path.exists(lib_path):
                 dest_dir = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
                 os.makedirs(dest_dir, exist_ok=True)
                 dest_path = os.path.abspath(os.path.normpath(os.path.join(dest_dir, lib_image)))
