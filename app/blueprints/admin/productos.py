@@ -5,6 +5,7 @@ import os
 import shutil
 import unicodedata
 import uuid
+from werkzeug.utils import secure_filename
 from ...models import db, expr_fecha, Producto, BajaInventario, ajustar_stock, registrar_auditoria
 from ...models.producto import CATEGORIAS
 from ..permisos import requiere_permiso, requiere_ver_pagina
@@ -206,13 +207,14 @@ def producto_editar(idproducto):
         prod.imagen = _save_image(new_image)
     else:
         lib_image = request.form.get('imagen_biblioteca', '').strip()
-        if lib_image and lib_image in _get_library_images():
-            lib_path = os.path.join(_library_dir(), lib_image)
+        safe_lib_image = secure_filename(lib_image)
+        if lib_image and safe_lib_image and safe_lib_image == lib_image and safe_lib_image in _get_library_images():
+            lib_path = os.path.join(_library_dir(), safe_lib_image)
             if os.path.exists(lib_path):
                 dest_dir = current_app.config['UPLOAD_FOLDER']
                 os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
-                prod.imagen = lib_image
+                shutil.copy2(lib_path, os.path.join(dest_dir, safe_lib_image))
+                prod.imagen = safe_lib_image
     db.session.commit()
     detalle = f'precio {precio_anterior}->{nuevo_precio}' if precio_anterior != nuevo_precio else None
     registrar_auditoria(current_user.email, 'editar_producto', f'producto:{idproducto}', detalle)
