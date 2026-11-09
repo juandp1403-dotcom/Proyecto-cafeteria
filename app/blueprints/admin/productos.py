@@ -1,6 +1,7 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, current_app
 from flask_login import login_required, current_user
 from PIL import Image
+from werkzeug.utils import secure_filename
 import os
 import shutil
 import unicodedata
@@ -56,7 +57,10 @@ def _save_image(file_storage):
     if ext not in ALLOWED_EXTENSIONS:
         return None
 
-    filename = os.path.basename(f"{uuid.uuid4().hex[:12]}.{ext}")
+    raw_filename = f"{uuid.uuid4().hex[:12]}.{ext}"
+    filename = secure_filename(raw_filename)
+    if not filename or not _allowed_image(filename):
+        return None
 
     upload_dir = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
     os.makedirs(upload_dir, exist_ok=True)
