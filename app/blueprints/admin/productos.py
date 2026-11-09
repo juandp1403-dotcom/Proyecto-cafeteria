@@ -1,6 +1,7 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, current_app
 from flask_login import login_required, current_user
 from PIL import Image
+from werkzeug.utils import secure_filename
 import os
 import shutil
 import unicodedata
@@ -51,15 +52,30 @@ def _save_image(file_storage):
         return None
     if not _es_imagen_valida(file_storage):
         return None
+
     ext = file_storage.filename.rsplit('.', 1)[1].lower()
-    filename = f"{uuid.uuid4().hex[:12]}.{ext}"
-    upload_dir = current_app.config['UPLOAD_FOLDER']
+    if ext not in ALLOWED_EXTENSIONS:
+        return None
+
+    raw_filename = f"{uuid.uuid4().hex[:12]}.{ext}"
+    filename = secure_filename(raw_filename)
+    if not filename or not _allowed_image(filename):
+        return None
+
+    upload_dir = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
     os.makedirs(upload_dir, exist_ok=True)
-    file_storage.save(os.path.join(upload_dir, filename))
+    upload_path = os.path.realpath(os.path.join(upload_dir, filename))
+    if os.path.commonpath([upload_dir, upload_path]) != upload_dir:
+        return None
+    file_storage.save(upload_path)
+
     # Copiar a biblioteca para reutilización futura
-    lib_dir = _library_dir()
+    lib_dir = os.path.realpath(_library_dir())
     os.makedirs(lib_dir, exist_ok=True)
-    shutil.copy2(os.path.join(upload_dir, filename), os.path.join(lib_dir, filename))
+    lib_path = os.path.realpath(os.path.join(lib_dir, filename))
+    if os.path.commonpath([lib_dir, lib_path]) != lib_dir:
+        return None
+    shutil.copy2(upload_path, lib_path)
     return filename
 
 
