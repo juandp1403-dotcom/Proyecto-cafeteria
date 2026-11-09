@@ -146,8 +146,9 @@ def producto_nuevo():
         # Solo se permite copiar un nombre que realmente este en la
         # biblioteca, para evitar un path traversal via ese campo.
         if lib_image and lib_image in _get_library_images():
-            lib_path = os.path.join(_library_dir(), lib_image)
-            if os.path.exists(lib_path):
+            library_root = os.path.realpath(_library_dir())
+            lib_path = os.path.realpath(os.path.join(library_root, lib_image))
+            if os.path.commonpath([library_root, lib_path]) == library_root and os.path.exists(lib_path):
                 dest_dir = current_app.config['UPLOAD_FOLDER']
                 os.makedirs(dest_dir, exist_ok=True)
                 shutil.copy2(lib_path, os.path.join(dest_dir, lib_image))
