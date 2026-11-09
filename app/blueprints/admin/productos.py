@@ -51,15 +51,34 @@ def _save_image(file_storage):
         return None
     if not _es_imagen_valida(file_storage):
         return None
-    ext = file_storage.filename.rsplit('.', 1)[1].lower()
+
+    # Derivar extension desde el contenido real de la imagen, no desde input de usuario.
+    try:
+        file_storage.stream.seek(0)
+        with Image.open(file_storage.stream) as img:
+            detected_ext = (img.format or '').lower()
+        file_storage.stream.seek(0)
+    except Exception:
+        return None
+
+    ext_aliases = {'jpeg': 'jpg'}
+    ext = ext_aliases.get(detected_ext, detected_ext)
+    if ext not in ALLOWED_EXTENSIONS:
+        return None
+
     filename = f"{uuid.uuid4().hex[:12]}.{ext}"
-    upload_dir = current_app.config['UPLOAD_FOLDER']
+    upload_dir = os.path.realpath(current_app.config['UPLOAD_FOLDER'])
     os.makedirs(upload_dir, exist_ok=True)
-    file_storage.save(os.path.join(upload_dir, filename))
+
+    dest_path = os.path.realpath(os.path.join(upload_dir, filename))
+    if not (dest_path == upload_dir or dest_path.startswith(upload_dir + os.sep)):
+        return None
+
+    file_storage.save(dest_path)
     # Copiar a biblioteca para reutilización futura
     lib_dir = _library_dir()
     os.makedirs(lib_dir, exist_ok=True)
-    shutil.copy2(os.path.join(upload_dir, filename), os.path.join(lib_dir, filename))
+    shutil.copy2(dest_path, os.path.join(lib_dir, filename))
     return filename
 
 
